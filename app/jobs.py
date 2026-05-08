@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -22,10 +23,52 @@ from .models import (
     User,
     UserNarrativeDelivery,
 )
+from .events import (
+    EventSpawnContext,
+    active_event_food_multiplier,
+    active_event_row,
+    auto_resolve_if_due,
+    try_spawn_event,
+)
 from .narrative import NarrativeContext, deliver_pending_narrative_messages
 
 
 log = logging.getLogger(__name__)
+
+_last_gamestate_log_mono = 0.0
+
+
+def _maybe_log_gamestate_snapshots(
+    snapshots: list[dict[str, object]],
+    interval_s: float,
+) -> None:
+    """Emit one INFO line per user every ``interval_s`` wall-clock seconds."""
+    global _last_gamestate_log_mono
+    if not snapshots or interval_s <= 0:
+        return
+    now_m = time.monotonic()
+    if now_m - _last_gamestate_log_mono < interval_s:
+        return
+    _last_gamestate_log_mono = now_m
+    for s in snapshots:
+        ev = s.get("active_event")
+        ev_s = ev if isinstance(ev, str) else "-"
+        log.info(
+            "gamestate user=%s pop=%d food=%.1f loyalty=%.1f rad_truth=%.2f "
+            "energy=%s departed_tick=%s event=%s food_mult=%.2f "
+            "crank_workers=%d food_workers=%d",
+            s["user_id"],
+            s["population"],
+            s["food"],
+            s["loyalty_final"],
+            s["radiation_truth"],
+            s["energy"],
+            s["departed_tick"],
+            ev_s,
+            s["food_mult"],
+            s["crank_workers"],
+            s["food_workers"],
+        )
 
 
 @dataclass(frozen=True)
@@ -223,9 +266,12 @@ def handle_food_reserve_change(
     food_per_capita_per_second: float,
     food_per_worker_per_second: float,
     tick_time: datetime,
+    food_consumption_multiplier: float = 1.0,
 ) -> None:
     """Net food change from farm workers vs population consumption (pre-tick headcount)."""
-    consumption_ps = population_for_consumption * food_per_capita_per_second
+    consumption_ps = (
+        population_for_consumption * food_per_capita_per_second * food_consumption_multiplier
+    )
     production_ps = bunker_systems.food_workers * food_per_worker_per_second
     new_level = max(
         0.0,
@@ -279,6 +325,8 @@ def game_tick(app: Flask) -> None:
 
     Ordering within each tick
     -------------------------
+    0. Random events        — auto-resolve expired rows; maybe spawn one new
+                              event; stash food consumption multiplier.
     1. Radiation decay      — based on wall-clock elapsed time.
     2. Loyalty changes      — crank overwork penalty applied first so that
                               a badly overworked crank already shows the
@@ -294,6 +342,9 @@ def game_tick(app: Flask) -> None:
                               population headcount (same gating window as other
                               systems). Worker assignments are normalized to
                               post-departure population before energy/food.
+                              Active random events may multiply consumption only.
+    7. Loyalty sample       — records crank-adjusted loyalty plus any auto-resolve
+                              loyalty delta from step 0.
 
     Time series and BunkerSystems reads share one app_context transaction.
     """
@@ -315,6 +366,8 @@ def game_tick(app: Flask) -> None:
             return
 
         processed_user_count = 0
+        gamestate_snapshots: list[dict[str, object]] = []
+        gs_interval = float(app.config["GAMESTATE_LOG_INTERVAL_SECONDS"])
         for user in users:
             user_id = user.id
 
@@ -329,6 +382,22 @@ def game_tick(app: Flask) -> None:
             if elapsed_seconds is None:
                 # Clock skew or duplicate run; skip rather than regress any value.
                 continue
+
+            auto_loyalty_adj = auto_resolve_if_due(user_id, tick_time)
+
+            if readings.latest_food_reserve is not None:
+                spawn_food = readings.latest_food_reserve.level
+            else:
+                spawn_food = app.config["INITIAL_FOOD"]
+            try_spawn_event(
+                user_id,
+                EventSpawnContext(
+                    latest_food_level=spawn_food,
+                    population_count=readings.latest_population_sample.count,
+                ),
+                tick_time,
+            )
+            food_mult = active_event_food_multiplier(user_id)
 
             handle_radiation_decay(
                 user_id,
@@ -402,11 +471,45 @@ def game_tick(app: Flask) -> None:
                     food_per_capita_per_second,
                     food_per_worker_per_second,
                     tick_time,
+                    food_consumption_multiplier=food_mult,
                 )
 
-            record_loyalty_sample(user_id, adjusted_loyalty, tick_time)
+            final_loyalty = max(0.0, min(100.0, adjusted_loyalty + auto_loyalty_adj))
+            record_loyalty_sample(user_id, final_loyalty, tick_time)
+
+            ev_row = active_event_row(user_id)
+            energy_val = readings.latest_energy_reserve
+            gamestate_snapshots.append(
+                {
+                    "user_id": user_id,
+                    "population": readings.latest_population_sample.count,
+                    "food": food_start_level,
+                    "loyalty_final": final_loyalty,
+                    "radiation_truth": readings.latest_radiation_level.level,
+                    "energy": (
+                        f"{energy_val.level:.2f}"
+                        if energy_val is not None
+                        else "na"
+                    ),
+                    "departed_tick": departed_this_tick,
+                    "active_event": ev_row.kind if ev_row is not None else None,
+                    "food_mult": food_mult,
+                    "crank_workers": (
+                        readings.bunker_systems.crank_workers
+                        if readings.bunker_systems is not None
+                        else 0
+                    ),
+                    "food_workers": (
+                        readings.bunker_systems.food_workers
+                        if readings.bunker_systems is not None
+                        else 0
+                    ),
+                }
+            )
 
             processed_user_count += 1
+
+        _maybe_log_gamestate_snapshots(gamestate_snapshots, gs_interval)
 
         if processed_user_count:
             db.session.commit()

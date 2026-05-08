@@ -69,6 +69,11 @@ class User(db.Model):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    active_game_event: Mapped[Optional["PlayerActiveEvent"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.id}>"
@@ -293,6 +298,37 @@ class SystemMessage(db.Model):
 
     def __repr__(self) -> str:
         return f"<SystemMessage user={self.user_id} t={self.timestamp} body={self.body!r}>"
+
+
+class PlayerActiveEvent(db.Model):
+    """At most one random gameplay event per player (PK on ``user_id``).
+
+    While present, event handlers adjust simulation (e.g. food consumption)
+    until ``auto_resolve_at`` or until the player resolves via an action.
+    """
+
+    __tablename__ = "player_active_events"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    kind: Mapped[str] = mapped_column(String(64), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    auto_resolve_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+
+    user: Mapped[User] = relationship(back_populates="active_game_event")
+
+    def __repr__(self) -> str:
+        return (
+            f"<PlayerActiveEvent user={self.user_id} kind={self.kind!r} "
+            f"until={self.auto_resolve_at}>"
+        )
 
 
 class UserNarrativeDelivery(db.Model):

@@ -29,6 +29,7 @@ from flask import Blueprint, current_app, jsonify, make_response, redirect, requ
 from sqlalchemy import select
 
 from .extensions import db
+from .events import active_event_status_payload, spec_for_kind, try_player_resolve
 from .jobs import noisy_radiation_display
 from .models import (
     BunkerLoyalty,
@@ -401,6 +402,35 @@ def farming_crop_status():
     resp = jsonify({"harvest_ready": harvest_ready, "can_plant": can_plant})
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
+
+
+@bp.route("/events/active-status")
+def events_active_status():
+    """JSON for Grafana: whether a random gameplay event is active."""
+    user = _identify_player()
+    payload = active_event_status_payload(user.id if user else None)
+    resp = jsonify(payload)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@bp.route("/action/resolve-event")
+def action_resolve_event():
+    """Resolve the active event via player action (kind must match)."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    kind = (request.args.get("kind") or "").strip()
+    if spec_for_kind(kind) is None:
+        return _action_response(user.id)
+
+    now = datetime.now(timezone.utc)
+    if try_player_resolve(user.id, kind, tick_time=now):
+        db.session.commit()
+        log.info("resolve-event: user=%s kind=%s", user.id, kind)
+
+    return _action_response(user.id)
 
 
 @bp.route("/system-messages")

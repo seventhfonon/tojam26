@@ -89,11 +89,30 @@ docker compose down            # stops containers, keeps data
 docker compose down -v         # also wipes the Postgres + Grafana volumes
 ```
 
+## Unit tests
+
+Tests live under `tests/` and use **pytest** (`pytest.ini` sets `pythonpath`).
+
+```bash
+pip install -r requirements.txt
+pytest -m "not integration"    # fast suite; no database required
+pytest                         # full suite (needs Postgres on `DATABASE_URL`)
+```
+
+### Guidelines
+
+- **Coverage over volume:** Add tests where bugs actually hide—invariants at module boundaries, wiring between packages (`jobs` ↔ `narrative`, `jobs` ↔ `events`), and config keys required by registries. Prefer one focused test over several that restate the same behavior.
+- **Stay succinct:** Short test bodies; extract helpers only when several tests share non-trivial setup. Avoid boilerplate “smoke” tests that only import a symbol unless they encode a real regression (e.g. a name that must remain imported because another function calls it by reference).
+- **No redundancy:** Do not test the standard library, Flask, or SQLAlchemy behavior. Do not duplicate the same assertion across multiple tests unless each failure mode is distinct (e.g. import binding vs. AST presence for the same regression).
+- **Integration sparingly:** Use the `integration` marker for checks that need a real DB (see `tests/test_game_tick_integration.py`). Keep them few and high-signal; default CI can run `-m "not integration"` only.
+
 ## Game tuning
 
 All knobs live in `app/constants.py` (radiation decay, population, energy,
 farming, etc.). Flask still exposes them on `current_app.config` for routes and
-jobs.
+jobs. Random gameplay event numbers (spawn odds, durations, loyalty deltas,
+eligibility thresholds, messages) live on each `GameEventSpec` in `app/events.py`,
+not in `constants.py`.
 
 With the defaults, a fresh player sees a smooth decay curve dropping from 100
 to ~50 over ten minutes, ~25 over twenty, etc. — slow enough to feel like an
@@ -122,6 +141,8 @@ session.
 │       └── datasources/postgres.yml
 ├── docker-compose.yml        # web + db + grafana
 ├── Dockerfile                # web image
+├── pytest.ini                # pytest paths + markers
+├── tests/                    # unit + integration tests
 ├── requirements.txt
 ├── wsgi.py                   # entrypoint
 ├── .env.example
