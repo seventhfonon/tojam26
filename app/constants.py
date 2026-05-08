@@ -59,3 +59,26 @@ FOOD_PER_CAPITA_PER_SECOND = 0.1
 FOOD_PER_WORKER_PER_SECOND = 1
 FARM_PLANT_GROWTH_SECONDS = 300
 FARM_HARVEST_YIELD = 50.0
+
+# --- Social (boredom / doubt / inner circle) ---
+INITIAL_BOREDOM = 0.0
+INITIAL_DOUBT = 0.0
+# Hidden stat: trust among the inner council (0–100).
+INITIAL_INNER_CIRCLE_LOYALTY = 50
+
+# Boredom rises slowly while nothing entertains the population.
+BOREDOM_PER_SECOND = 0.02
+
+# Doubt rises faster when outdoor truth radiation is far below session start (100 rads).
+DOUBT_GROWTH_MAX_PER_SECOND = 0.025
+
+SOCIAL_MOVIE_COOLDOWN_SECONDS = 300
+SOCIAL_SPEECH_COOLDOWN_SECONDS = 300
+SOCIAL_COUNCIL_COOLDOWN_SECONDS = 600
+
+# First movie / speech use full effect; later uses scale down via 1/(1 + k * use_count).
+SOCIAL_MOVIE_BOREDOM_RELIEF_BASE = 18.0
+SOCIAL_MOVIE_DIMINISH_K = 0.45
+SOCIAL_SPEECH_LOYALTY_GAIN_BASE = 10.0
+SOCIAL_SPEECH_DOUBT_RELIEF_BASE = 12.0
+SOCIAL_SPEECH_DIMINISH_K = 0.5

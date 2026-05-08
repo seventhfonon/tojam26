@@ -12,6 +12,8 @@ from sqlalchemy import select
 
 from .extensions import db
 from .models import (
+    BunkerBoredom,
+    BunkerDoubt,
     BunkerLoyalty,
     BunkerPopulation,
     BunkerSystems,
@@ -35,6 +37,8 @@ class GameTickReadings:
     latest_radiation_level: RadiationLevel
     latest_population_sample: BunkerPopulation
     latest_loyalty_sample: BunkerLoyalty
+    latest_boredom_sample: BunkerBoredom
+    latest_doubt_sample: BunkerDoubt
     latest_energy_reserve: EnergyReserve | None
     latest_food_reserve: FoodReserve | None
     bunker_systems: BunkerSystems | None
@@ -62,6 +66,20 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         .limit(1)
     ).first()
 
+    latest_boredom_sample = db.session.scalars(
+        select(BunkerBoredom)
+        .where(BunkerBoredom.user_id == user_id)
+        .order_by(BunkerBoredom.timestamp.desc())
+        .limit(1)
+    ).first()
+
+    latest_doubt_sample = db.session.scalars(
+        select(BunkerDoubt)
+        .where(BunkerDoubt.user_id == user_id)
+        .order_by(BunkerDoubt.timestamp.desc())
+        .limit(1)
+    ).first()
+
     latest_energy_reserve = db.session.scalars(
         select(EnergyReserve)
         .where(EnergyReserve.user_id == user_id)
@@ -82,6 +100,8 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         latest_radiation_level is None
         or latest_population_sample is None
         or latest_loyalty_sample is None
+        or latest_boredom_sample is None
+        or latest_doubt_sample is None
     ):
         return None
 
@@ -89,6 +109,8 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         latest_radiation_level=latest_radiation_level,
         latest_population_sample=latest_population_sample,
         latest_loyalty_sample=latest_loyalty_sample,
+        latest_boredom_sample=latest_boredom_sample,
+        latest_doubt_sample=latest_doubt_sample,
         latest_energy_reserve=latest_energy_reserve,
         latest_food_reserve=latest_food_reserve,
         bunker_systems=bunker_systems,
@@ -111,6 +133,15 @@ def noisy_radiation_display(true_level: float, noise_max: float) -> float:
     return max(0.0, true_level + offset)
 
 
+def radiation_truth_after_decay(
+    current_truth_level: float,
+    elapsed_seconds: float,
+    decay_half_life_seconds: float,
+) -> float:
+    """Outdoor radiation truth after exponential decay (same formula as tick writes)."""
+    return current_truth_level * (0.5 ** (elapsed_seconds / decay_half_life_seconds))
+
+
 def handle_radiation_decay(
     user_id: str,
     latest_radiation_level: RadiationLevel,
@@ -119,8 +150,10 @@ def handle_radiation_decay(
     display_noise_max: float,
     tick_time: datetime,
 ) -> None:
-    new_radiation_level = latest_radiation_level.level * (
-        0.5 ** (elapsed_seconds / decay_half_life_seconds)
+    new_radiation_level = radiation_truth_after_decay(
+        latest_radiation_level.level,
+        elapsed_seconds,
+        decay_half_life_seconds,
     )
     new_display = noisy_radiation_display(new_radiation_level, display_noise_max)
     db.session.add(
@@ -130,6 +163,35 @@ def handle_radiation_decay(
             level_display=new_display,
             timestamp=tick_time,
         )
+    )
+
+
+def handle_boredom_and_doubt_tick(
+    user_id: str,
+    latest_boredom_sample: BunkerBoredom,
+    latest_doubt_sample: BunkerDoubt,
+    new_radiation_truth: float,
+    elapsed_seconds: float,
+    boredom_per_second: float,
+    doubt_growth_max_per_second: float,
+    initial_radiation: float,
+    tick_time: datetime,
+) -> None:
+    new_boredom = min(
+        100.0,
+        latest_boredom_sample.boredom + boredom_per_second * elapsed_seconds,
+    )
+    denom = max(float(initial_radiation), 1e-9)
+    doubt_factor = max(0.0, 1.0 - (new_radiation_truth / denom))
+    new_doubt = min(
+        100.0,
+        latest_doubt_sample.doubt + doubt_growth_max_per_second * doubt_factor * elapsed_seconds,
+    )
+    db.session.add(
+        BunkerBoredom(user_id=user_id, boredom=new_boredom, timestamp=tick_time)
+    )
+    db.session.add(
+        BunkerDoubt(user_id=user_id, doubt=new_doubt, timestamp=tick_time)
     )
 
 
@@ -280,17 +342,19 @@ def game_tick(app: Flask) -> None:
     Ordering within each tick
     -------------------------
     1. Radiation decay      — based on wall-clock elapsed time.
-    2. Loyalty changes      — crank overwork penalty applied first so that
+    2. Boredom / doubt      — boredom rises with time; doubt rises as outdoor truth
+                              radiation falls below session baseline.
+    3. Loyalty changes      — crank overwork penalty applied first so that
                               a badly overworked crank already shows the
                               disloyalty hit this same tick.
-    3. Population departures— uses post-penalty loyalty so that overworking
+    4. Population departures— uses post-penalty loyalty so that overworking
                               has an immediate effect on resident willingness
                               to leave.
-    4. Narrative beats       — one-shot scripted lines when triggers fire
+    5. Narrative beats       — one-shot scripted lines when triggers fire
                               (logged in ``user_narrative_deliveries``).
-    5. Energy net change    — draw from active systems, generation from crank
+    6. Energy net change    — draw from active systems, generation from crank
                               workers, both scaled by elapsed time.
-    6. Food net change      — farm workers produce; consumption uses *pre-tick*
+    7. Food net change      — farm workers produce; consumption uses *pre-tick*
                               population headcount (same gating window as other
                               systems). Worker assignments are normalized to
                               post-departure population before energy/food.
@@ -308,6 +372,9 @@ def game_tick(app: Flask) -> None:
         crank_power_per_worker_per_second = app.config["CRANK_POWER_PER_WORKER"]
         food_per_capita_per_second = app.config["FOOD_PER_CAPITA_PER_SECOND"]
         food_per_worker_per_second = app.config["FOOD_PER_WORKER_PER_SECOND"]
+        boredom_per_second = app.config["BOREDOM_PER_SECOND"]
+        doubt_growth_max_per_second = app.config["DOUBT_GROWTH_MAX_PER_SECOND"]
+        initial_radiation = app.config["INITIAL_RADIATION"]
         tick_time = datetime.now(timezone.utc)
 
         users = db.session.scalars(select(User)).all()
@@ -336,6 +403,23 @@ def game_tick(app: Flask) -> None:
                 elapsed_seconds,
                 decay_half_life_seconds,
                 radiation_display_noise_max,
+                tick_time,
+            )
+
+            new_radiation_truth = radiation_truth_after_decay(
+                readings.latest_radiation_level.level,
+                elapsed_seconds,
+                decay_half_life_seconds,
+            )
+            handle_boredom_and_doubt_tick(
+                user_id,
+                readings.latest_boredom_sample,
+                readings.latest_doubt_sample,
+                new_radiation_truth,
+                elapsed_seconds,
+                boredom_per_second,
+                doubt_growth_max_per_second,
+                initial_radiation,
                 tick_time,
             )
 

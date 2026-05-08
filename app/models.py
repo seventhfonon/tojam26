@@ -69,6 +69,19 @@ class User(db.Model):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    boredom_samples: Mapped[list["BunkerBoredom"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    doubt_samples: Mapped[list["BunkerDoubt"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    bunker_social_state: Mapped[Optional["BunkerSocialState"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.id}>"
@@ -166,6 +179,84 @@ class BunkerLoyalty(db.Model):
 
     def __repr__(self) -> str:
         return f"<BunkerLoyalty user={self.user_id} t={self.timestamp} loyalty={self.loyalty:.1f}>"
+
+
+class BunkerBoredom(db.Model):
+    """Point-in-time bunker boredom (0–100); append-only for Grafana."""
+
+    __tablename__ = "bunker_boredom"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    boredom: Mapped[float] = mapped_column(Float, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="boredom_samples")
+
+    def __repr__(self) -> str:
+        return f"<BunkerBoredom user={self.user_id} t={self.timestamp} boredom={self.boredom:.1f}>"
+
+
+class BunkerDoubt(db.Model):
+    """Point-in-time collective doubt (0–100); append-only for Grafana."""
+
+    __tablename__ = "bunker_doubt"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    doubt: Mapped[float] = mapped_column(Float, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="doubt_samples")
+
+    def __repr__(self) -> str:
+        return f"<BunkerDoubt user={self.user_id} t={self.timestamp} doubt={self.doubt:.1f}>"
+
+
+class BunkerSocialState(db.Model):
+    """Mutable social controls: cooldowns, diminishing-return counters, hidden inner circle."""
+
+    __tablename__ = "bunker_social_state"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    inner_circle_loyalty: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    movie_action_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    speech_action_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_show_movie_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_give_speech_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_meet_council_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped[User] = relationship(back_populates="bunker_social_state")
+
+    def __repr__(self) -> str:
+        return (
+            f"<BunkerSocialState user={self.user_id} "
+            f"inner_circle={self.inner_circle_loyalty}>"
+        )
 
 
 class EnergyReserve(db.Model):
