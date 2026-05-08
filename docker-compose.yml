@@ -17,30 +17,16 @@ services:
 
   web:
     build: .
+    # Mount the repo so local edits to `app/` (models, startup migrations) apply
+    # without rebuilding the image. Restart or recreate `web` after changes so
+    # `create_app()` runs again and applies `db.create_all()` / `_ensure_*` guards.
+    volumes:
+      - .:/app
     environment:
       FLASK_SECRET_KEY: dev-secret-change-me
       DATABASE_URL: postgresql+psycopg://silo:silo@db:5432/silo
       GRAFANA_URL: http://localhost:3000
       GRAFANA_DASHBOARD_UID: silo-environment
-      INITIAL_RADIATION: "100.0"
-      RADIATION_DISPLAY_NOISE_MAX: "5.0"
-      DECAY_TICK_SECONDS: "30"
-      DECAY_HALF_LIFE_SECONDS: "600"
-      INITIAL_POPULATION: "100"
-      INITIAL_LOYALTY: "75.0"
-      RADIATION_SAFE_THRESHOLD: "50.0"
-      BASE_DEPARTURE_RATE: "0.05"
-      INITIAL_ENERGY: "100.0"
-      LIGHTS_POWER_DRAW: "0.01"
-      CRANK_POWER_PER_WORKER: "0.002"
-      CRANK_WORKERS_LOYALTY_THRESHOLD: "10"
-      CRANK_WORKERS_LOYALTY_PENALTY: "0.5"
-      MANUAL_CRANK_ENERGY: "1.0"
-      INITIAL_FOOD: "1000.0"
-      FOOD_PER_CAPITA_PER_SECOND: "0.1"
-      FOOD_PER_WORKER_PER_SECOND: "0.5"
-      FARM_PLANT_GROWTH_SECONDS: "300"
-      FARM_HARVEST_YIELD: "50.0"
     depends_on:
       db:
         condition: service_healthy

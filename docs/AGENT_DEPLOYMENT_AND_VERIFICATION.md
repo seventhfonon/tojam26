@@ -16,17 +16,45 @@ For product architecture and tuning knobs, see the root [README.md](../README.md
 
 ## 2. Start or refresh the stack
 
-**Full rebuild (after Dockerfile or `requirements.txt` changes):**
+The `web` service **bind-mounts the repository** into `/app`, so edits to `app/`
+and other tracked files are visible inside the container **without** rebuilding
+the image. Python dependencies still come from the image layers built from
+`requirements.txt`.
+
+**First boot or after `Dockerfile` / `requirements.txt` changes (rebuild image):**
 
 ```bash
 docker compose up -d --build
 ```
 
-**Start without rebuild (compose/env/dashboard volume mounts only):**
+**Rebuild only `web` (faster when other services are unchanged):**
+
+```bash
+docker compose up -d --build web
+```
+
+**Start without rebuilding** (image already current; e.g. only `docker-compose.yml` or `app/constants.py` changed):
 
 ```bash
 docker compose up -d
 ```
+
+### Schema / “Grafana says column does not exist”
+
+Migrations in this repo are **not** a separate migrate container: **`create_app()`**
+runs `db.create_all()` and a few `_ensure_*` SQL guards in `app/__init__.py` when
+the **Flask process starts**.
+
+After an agent changes `app/models.py` or adds `_ensure_*` logic, **restart or
+recreate `web`** so that code runs against Postgres again:
+
+```bash
+docker compose up -d --force-recreate web
+# or: docker compose restart web
+```
+
+With the bind mount, **rebuilding is not required** for Python-only schema edits;
+rebuild when dependencies or the Dockerfile change.
 
 **Foreground run with logs (debugging):**
 
@@ -113,20 +141,11 @@ Use a variable name other than `UID` (reserved on macOS / zsh); e.g. `SILO_UID=$
 docker compose exec -T db psql -U silo -d silo -c "\dt system_messages"
 ```
 
-**Outdoor radiation (`level` vs noisy `level_display`):** after `web` has started at least once, Postgres should have both columns (new installs get them from `create_all()`; old volumes get `level_display` from the app startup guard in `app/__init__.py`).
+**Spot-check columns** (replace table name as needed):
 
 ```bash
 docker compose exec -T db psql -U silo -d silo -c "\d radiation_levels"
-docker compose exec -T db psql -U silo -d silo -c "SELECT level, level_display FROM radiation_levels LIMIT 3;"
-```
-
-Grafana panels use `COALESCE(level_display, level)`. If Grafana reports “column does not exist”, the DB was never migrated: restart the `web` container (or run `ALTER TABLE radiation_levels ADD COLUMN IF NOT EXISTS level_display double precision` plus `UPDATE radiation_levels SET level_display = level WHERE level_display IS NULL` as `silo`).
-
-**Farming (`food_reserves`, `bunker_systems.food_workers`, `crop_ready_at`):**
-
-```bash
 docker compose exec -T db psql -U silo -d silo -c "\d food_reserves"
-docker compose exec -T db psql -U silo -d silo -c "SELECT level, consumption_per_second, production_per_second FROM food_reserves LIMIT 2;"
 ```
 
 Use `-T` on `docker compose exec` when piping to avoid TTY allocation issues.
@@ -185,7 +204,7 @@ Past sessions used this to spot failed `/api/ds/query` requests (e.g. missing `v
 
 - **Game tick and other jobs** run **inside the `web` container** via APScheduler; they are not separate containers.
 - In **Flask debug mode**, the reloader can spawn two processes; the app factory should only start the scheduler in the worker that owns ticks (see `WERKZEUG_RUN_MAIN` guard in `app/__init__.py`).
-- Schema is bootstrapped with **`db.create_all()`** on startup, not Alembic (see README caveats).
+- Schema is applied on **`web` startup**: `db.create_all()` plus `_ensure_*` helpers in `app/__init__.py` (not Alembic yet—see README). If Grafana SQL errors mention a missing column, restart `web` after merging model/migration code, or add an `_ensure_*` guard for additive changes to existing tables on old volumes.
 
 ---
 
@@ -193,9 +212,10 @@ Past sessions used this to spot failed `/api/ds/query` requests (e.g. missing `v
 
 1. `python3 -m compileall app -q`
 2. `python3 -c "import json; ..."` for any edited `grafana/dashboards/*.json`
-3. `docker compose up -d --build` (or `-d` if only JSON/env changed and images unchanged)
-4. `curl -s http://localhost:5001/healthz`
-5. Spot-check Grafana URLs above or open `http://localhost:5001/new` in a browser
+3. If **`requirements.txt` or `Dockerfile` changed:** `docker compose up -d --build web`
+4. If only **`app/`** (models, `__init__.py` guards, jobs, routes): `docker compose up -d --force-recreate web` (or `docker compose restart web`) so migrations run again
+5. `curl -s http://localhost:5001/healthz`
+6. Spot-check Grafana URLs above or open `http://localhost:5001/new` in a browser
 
 ---
 
