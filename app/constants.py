@@ -8,8 +8,8 @@ from __future__ import annotations
 # measurement rather than a countdown.
 INITIAL_RADIATION = 100.0
 # Uniform jitter ± this many rads on ``level_display`` each sample (truth stays in ``level``).
-RADIATION_DISPLAY_NOISE_MAX = 5.0
-DECAY_TICK_SECONDS = 30
+RADIATION_DISPLAY_NOISE_MAX = 10.0
+DECAY_TICK_SECONDS = 1
 DECAY_HALF_LIFE_SECONDS = 600
 
 # --- Population & loyalty ---
