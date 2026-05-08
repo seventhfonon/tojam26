@@ -381,6 +381,21 @@ def action_harvest_crops():
     return _action_response(user.id)
 
 
+@bp.route("/farming/crop-status")
+def farming_crop_status():
+    """JSON for Grafana: whether harvest is allowed (crop timer elapsed)."""
+    user = _identify_player()
+    harvest_ready = False
+    if user is not None:
+        systems = db.session.get(BunkerSystems, user.id)
+        if systems is not None and systems.crop_ready_at is not None:
+            now = datetime.now(timezone.utc)
+            harvest_ready = now >= systems.crop_ready_at
+    resp = jsonify({"harvest_ready": harvest_ready})
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
 @bp.route("/system-messages")
 def system_messages():
     """Return the 5 most recent system messages for the current player.

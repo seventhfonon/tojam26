@@ -137,16 +137,6 @@ def _maybe_start_scheduler(app: Flask) -> None:
         max_instances=1,
         coalesce=True,
     )
-    scheduler.add_job(
-        func=post_test_message,
-        kwargs={"app": app},
-        trigger="interval",
-        seconds=60,
-        id="post_test_message",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
     scheduler.start()
     log.info(
         "game tick scheduler started (tick=%ss, half-life=%ss, safe-threshold=%.1f)",
