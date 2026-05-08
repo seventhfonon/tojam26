@@ -25,7 +25,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://localhost:3000")
-    GRAFANA_DASHBOARD_UID = os.environ.get("GRAFANA_DASHBOARD_UID", "silo-main")
+    GRAFANA_DASHBOARD_UID = os.environ.get("GRAFANA_DASHBOARD_UID", "silo-environment")
 
     # --- Radiation ---
     # Half-life of 600s with a 30s tick gives a visible decay curve over the

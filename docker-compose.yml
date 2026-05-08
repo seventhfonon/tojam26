@@ -21,7 +21,7 @@ services:
       FLASK_SECRET_KEY: dev-secret-change-me
       DATABASE_URL: postgresql+psycopg://silo:silo@db:5432/silo
       GRAFANA_URL: http://localhost:3000
-      GRAFANA_DASHBOARD_UID: silo-main
+      GRAFANA_DASHBOARD_UID: silo-environment
       INITIAL_RADIATION: "100.0"
       DECAY_TICK_SECONDS: "30"
       DECAY_HALF_LIFE_SECONDS: "600"
@@ -58,7 +58,7 @@ services:
       GF_PANELS_DISABLE_SANITIZE_HTML: "true"
       GF_DASHBOARDS_MIN_REFRESH_INTERVAL: "1s"
       # Land on our provisioned dashboard by default.
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/radiation.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/environment.json
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
