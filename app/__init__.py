@@ -96,6 +96,48 @@ def _ensure_food_reserve_rate_columns() -> None:
         )
 
 
+def _ensure_bunker_social_seed_data() -> None:
+    """Backfill social tables for users created before social simulation existed."""
+    tables = inspect(db.engine).get_table_names()
+    if "users" not in tables:
+        return
+    if "bunker_social_state" not in tables:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO bunker_social_state "
+                "(user_id, inner_circle_loyalty, movie_action_count, speech_action_count) "
+                "SELECT u.id, 50, 0, 0 FROM users u "
+                "WHERE NOT EXISTS ("
+                "  SELECT 1 FROM bunker_social_state s WHERE s.user_id = u.id"
+                ")"
+            )
+        )
+    if "bunker_boredom" in tables:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO bunker_boredom (user_id, boredom, timestamp) "
+                    "SELECT u.id, 0, now() FROM users u "
+                    "WHERE NOT EXISTS ("
+                    "  SELECT 1 FROM bunker_boredom b WHERE b.user_id = u.id"
+                    ")"
+                )
+            )
+    if "bunker_doubt" in tables:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO bunker_doubt (user_id, doubt, timestamp) "
+                    "SELECT u.id, 0, now() FROM users u "
+                    "WHERE NOT EXISTS ("
+                    "  SELECT 1 FROM bunker_doubt d WHERE d.user_id = u.id"
+                    ")"
+                )
+            )
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -108,6 +150,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_radiation_level_display_column()
         _ensure_bunker_systems_farming_columns()
         _ensure_food_reserve_rate_columns()
+        _ensure_bunker_social_seed_data()
 
     _maybe_start_scheduler(app)
 
