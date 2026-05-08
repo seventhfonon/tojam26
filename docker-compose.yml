@@ -29,6 +29,12 @@ services:
       INITIAL_LOYALTY: "75.0"
       RADIATION_SAFE_THRESHOLD: "50.0"
       BASE_DEPARTURE_RATE: "0.05"
+      INITIAL_ENERGY: "100.0"
+      LIGHTS_POWER_DRAW: "0.01"
+      CRANK_POWER_PER_WORKER: "0.002"
+      CRANK_WORKERS_LOYALTY_THRESHOLD: "10"
+      CRANK_WORKERS_LOYALTY_PENALTY: "0.5"
+      MANUAL_CRANK_ENERGY: "1.0"
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +53,10 @@ services:
       GF_AUTH_BASIC_ENABLED: "false"
       # Allow embedding under Flask later if we want to reverse-proxy.
       GF_SECURITY_ALLOW_EMBEDDING: "true"
+      # Allow full HTML (including inline styles) in Text panels so action
+      # buttons can be styled. Only safe because Grafana has no public access.
+      GF_PANELS_DISABLE_SANITIZE_HTML: "true"
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: "1s"
       # Land on our provisioned dashboard by default.
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/radiation.json
     volumes:

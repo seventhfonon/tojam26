@@ -53,5 +53,27 @@ class Config:
     # threshold is crossed. Loyalty 100 → 0 departures regardless.
     BASE_DEPARTURE_RATE = _env_float("BASE_DEPARTURE_RATE", 0.05)
 
+    # --- Energy ---
+    INITIAL_ENERGY = _env_float("INITIAL_ENERGY", 100.0)
+
+    # Power draw of the lights system in energy/second. Other systems will
+    # follow the same pattern when added (HVAC_POWER_DRAW, etc.).
+    LIGHTS_POWER_DRAW = _env_float("LIGHTS_POWER_DRAW", 0.01)
+
+    # Each worker assigned to the crank generates this much energy per second.
+    # At 0.002/s, 5 workers exactly offsets the lights; 10 workers generate
+    # double the lights draw, giving headroom for future systems.
+    CRANK_POWER_PER_WORKER = _env_float("CRANK_POWER_PER_WORKER", 0.002)
+
+    # Workers above this count start reducing loyalty each tick.
+    CRANK_WORKERS_LOYALTY_THRESHOLD = _env_int("CRANK_WORKERS_LOYALTY_THRESHOLD", 10)
+
+    # Loyalty lost per tick per worker above the threshold.
+    # With defaults: 11 workers → -0.5/tick; 20 workers → -5/tick.
+    CRANK_WORKERS_LOYALTY_PENALTY = _env_float("CRANK_WORKERS_LOYALTY_PENALTY", 0.5)
+
+    # Energy added by a single manual crank button press.
+    MANUAL_CRANK_ENERGY = _env_float("MANUAL_CRANK_ENERGY", 1.0)
+
     USER_COOKIE_NAME = "silo_user_id"
     USER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365  # 1 year
