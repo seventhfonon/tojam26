@@ -31,6 +31,7 @@ class NarrativeContext:
     tick_time: datetime
     departed_this_tick: int
     had_prior_departure_event: bool
+    had_prior_welcome_message: bool
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,11 @@ def _trigger_first_departure_notice(ctx: NarrativeContext) -> bool:
     return ctx.departed_this_tick > 0 and not ctx.had_prior_departure_event
 
 
+def _trigger_welcome_message(ctx: NarrativeContext) -> bool:
+    """True the first time anyone reads this message."""
+    return not ctx.had_prior_welcome_message
+
+
 NARRATIVE_MESSAGES: tuple[NarrativeMessage, ...] = (
     NarrativeMessage(
         id="first_departure_notice",
@@ -55,6 +61,15 @@ NARRATIVE_MESSAGES: tuple[NarrativeMessage, ...] = (
             "More may follow."
         ),
         trigger=_trigger_first_departure_notice,
+    ),
+    NarrativeMessage(
+        id="welcome_message",
+        text=(
+            "Welcome to Bunker.OS 1.2.0. ",
+            "If you are reading this message, a nuclear apocalypse has occurred. ",
+            "It is not safe to go outside."
+        ),
+        trigger=_trigger_welcome_message,
     ),
 )
 

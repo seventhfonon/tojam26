@@ -20,6 +20,7 @@ from .models import (
     RadiationLevel,
     SystemMessage,
     User,
+    UserNarrativeDelivery,
 )
 from .narrative import NarrativeContext, deliver_pending_narrative_messages
 
@@ -160,6 +161,14 @@ def user_had_prior_departure_event(user_id: str) -> bool:
     ).first()
     return row is not None
 
+def user_had_prior_welcome_message(user_id: str) -> bool:
+    """True if any narrative delivery before this tick recorded the welcome message."""
+    row = db.session.scalars(
+        select(UserNarrativeDelivery.id)
+        .where(UserNarrativeDelivery.user_id == user_id, UserNarrativeDelivery.message_id == "welcome_message")
+        .limit(1)
+    ).first()
+    return row is not None
 
 def handle_population_departures(
     user_id: str,
@@ -338,6 +347,7 @@ def game_tick(app: Flask) -> None:
             )
 
             had_prior_departure_event = user_had_prior_departure_event(user_id)
+            had_prior_welcome_message = user_had_prior_welcome_message(user_id)
 
             departed_this_tick = handle_population_departures(
                 user_id,
@@ -359,6 +369,7 @@ def game_tick(app: Flask) -> None:
                     tick_time=tick_time,
                     departed_this_tick=departed_this_tick,
                     had_prior_departure_event=had_prior_departure_event,
+                    had_prior_welcome_message=had_prior_welcome_message,
                 )
             )
 
