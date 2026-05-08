@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Float, ForeignKey
+from sqlalchemy import DateTime, Float, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,6 +35,14 @@ class User(db.Model):
     )
 
     radiation_samples: Mapped[list["RadiationLevel"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    population_samples: Mapped[list["BunkerPopulation"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    loyalty_samples: Mapped[list["BunkerLoyalty"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
@@ -64,3 +72,65 @@ class RadiationLevel(db.Model):
 
     def __repr__(self) -> str:
         return f"<RadiationLevel user={self.user_id} t={self.timestamp} level={self.level:.3f}>"
+
+
+class BunkerPopulation(db.Model):
+    """A point-in-time headcount of people still living in the bunker.
+
+    ``departed`` records how many left during this tick. It is zero on the
+    seeding row and on any tick where nobody left (radiation still too high,
+    or everyone is loyal enough to stay put). Storing it here lets us render
+    an exodus-events chart in Grafana without a second table.
+    """
+
+    __tablename__ = "bunker_population"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+    departed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    user: Mapped[User] = relationship(back_populates="population_samples")
+
+    def __repr__(self) -> str:
+        return f"<BunkerPopulation user={self.user_id} t={self.timestamp} count={self.count} departed={self.departed}>"
+
+
+class BunkerLoyalty(db.Model):
+    """A point-in-time loyalty reading (0–100) for the bunker population.
+
+    100 = unwavering faith in the leader's decision to stay underground.
+    0   = everyone is actively planning to leave the moment it looks safe.
+
+    A row is written every tick so Grafana gets a continuous time series even
+    before any player actions exist to change the value. When gameplay systems
+    that affect loyalty are added, they should append a new row rather than
+    mutating in place, preserving the full history.
+    """
+
+    __tablename__ = "bunker_loyalty"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    loyalty: Mapped[float] = mapped_column(Float, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="loyalty_samples")
+
+    def __repr__(self) -> str:
+        return f"<BunkerLoyalty user={self.user_id} t={self.timestamp} loyalty={self.loyalty:.1f}>"

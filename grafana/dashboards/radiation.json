@@ -3,7 +3,7 @@
   "title": "Silo: Bunker Telemetry",
   "tags": ["silo", "game"],
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -36,7 +36,7 @@
       "id": 1,
       "type": "timeseries",
       "title": "Outdoor radiation (rads)",
-      "description": "Measured external radiation level. The world is recovering, whether the player believes it or not.",
+      "description": "Measured external radiation level. The world is recovering, whether the player believes it or not. The dashed line marks the threshold below which residents begin reconsidering their stay.",
       "datasource": {
         "type": "postgres",
         "uid": "silo-postgres"
@@ -55,7 +55,17 @@
             "fillOpacity": 20,
             "pointSize": 4,
             "showPoints": "auto",
-            "axisPlacement": "auto"
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "transparent", "value": null},
+              {"color": "orange", "value": 50}
+            ]
           }
         },
         "overrides": []
@@ -77,12 +87,13 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Latest reading",
+      "title": "Radiation",
+      "description": "Current outdoor radiation level.",
       "datasource": {
         "type": "postgres",
         "uid": "silo-postgres"
       },
-      "gridPos": {"x": 0, "y": 10, "w": 8, "h": 6},
+      "gridPos": {"x": 0, "y": 10, "w": 8, "h": 5},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -114,6 +125,196 @@
           "format": "time_series",
           "rawQuery": true,
           "rawSql": "SELECT timestamp AS time, level FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Bunker population",
+      "description": "Number of people currently living in the bunker.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {"x": 8, "y": 10, "w": 8, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "orange", "value": 10},
+              {"color": "yellow", "value": 25},
+              {"color": "green", "value": 40}
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, count FROM bunker_population WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Loyalty",
+      "description": "Population loyalty to the bunker leader (0 = everyone wants to leave; 100 = unquestioning faith).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {"x": 16, "y": 10, "w": 8, "h": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "orange", "value": 30},
+              {"color": "yellow", "value": 50},
+              {"color": "green", "value": 70}
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, loyalty FROM bunker_loyalty WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Bunker population over time",
+      "description": "Headcount and per-tick departures. Departures are only possible once outdoor radiation drops below the safe threshold.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {"x": 0, "y": 15, "w": 12, "h": 10},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 0,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Departed"},
+            "properties": [
+              {"id": "custom.drawStyle", "value": "bars"},
+              {"id": "custom.fillOpacity", "value": 80},
+              {"id": "custom.axisPlacement", "value": "right"},
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "semi-dark-red"}}
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, count AS \"Population\" FROM bunker_population WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
+        },
+        {
+          "refId": "B",
+          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, departed AS \"Departed\" FROM bunker_population WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Loyalty over time",
+      "description": "How loyal the bunker population is to the leader. Will begin falling once residents realise radiation outside is manageable.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {"x": 12, "y": 15, "w": 12, "h": 10},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 100,
+          "decimals": 1,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "single", "sort": "none"}
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, loyalty AS \"Loyalty\" FROM bunker_loyalty WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
         }
       ]
     }

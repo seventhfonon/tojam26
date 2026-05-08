@@ -10,7 +10,7 @@ from flask import Flask
 
 from .config import Config
 from .extensions import db, scheduler
-from .jobs import decay_radiation
+from .jobs import game_tick
 from .routes import bp as main_bp
 
 
@@ -33,7 +33,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
 
 def _maybe_start_scheduler(app: Flask) -> None:
-    """Start the radiation-decay job, guarding against Flask's debug reloader.
+    """Start the game-tick job, guarding against Flask's debug reloader.
 
     The reloader spawns two processes; only the child (with WERKZEUG_RUN_MAIN=true)
     should own the scheduler so we don't double-tick.
@@ -46,20 +46,21 @@ def _maybe_start_scheduler(app: Flask) -> None:
         return
 
     scheduler.add_job(
-        func=decay_radiation,
+        func=game_tick,
         kwargs={"app": app},
         trigger="interval",
         seconds=app.config["DECAY_TICK_SECONDS"],
-        id="radiation_decay",
+        id="game_tick",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
     )
     scheduler.start()
     log.info(
-        "radiation decay scheduler started (tick=%ss, half-life=%ss)",
+        "game tick scheduler started (tick=%ss, half-life=%ss, safe-threshold=%.1f)",
         app.config["DECAY_TICK_SECONDS"],
         app.config["DECAY_HALF_LIFE_SECONDS"],
+        app.config["RADIATION_SAFE_THRESHOLD"],
     )
 
     atexit.register(lambda: scheduler.shutdown(wait=False))

@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 from flask import Blueprint, current_app, make_response, redirect, request
 
 from .extensions import db
-from .models import RadiationLevel, User
+from .models import BunkerLoyalty, BunkerPopulation, RadiationLevel, User
 
 
 bp = Blueprint("main", __name__)
@@ -44,6 +44,19 @@ def _get_or_create_player() -> User:
         RadiationLevel(
             user_id=user.id,
             level=current_app.config["INITIAL_RADIATION"],
+        )
+    )
+    db.session.add(
+        BunkerPopulation(
+            user_id=user.id,
+            count=current_app.config["INITIAL_POPULATION"],
+            departed=0,
+        )
+    )
+    db.session.add(
+        BunkerLoyalty(
+            user_id=user.id,
+            loyalty=current_app.config["INITIAL_LOYALTY"],
         )
     )
     db.session.commit()
