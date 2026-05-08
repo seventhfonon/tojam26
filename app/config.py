@@ -38,7 +38,7 @@ class Config:
     DECAY_HALF_LIFE_SECONDS = _env_int("DECAY_HALF_LIFE_SECONDS", 600)
 
     # --- Population & loyalty ---
-    INITIAL_POPULATION = _env_int("INITIAL_POPULATION", 50)
+    INITIAL_POPULATION = _env_int("INITIAL_POPULATION", 100)
     # 0 = everyone wants out; 100 = unquestioning faith in the bunker.
     INITIAL_LOYALTY = _env_float("INITIAL_LOYALTY", 75.0)
 
