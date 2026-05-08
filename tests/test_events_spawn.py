@@ -5,12 +5,18 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from app.events import EventSpawnContext, RATS_SILO_KIND, try_spawn_event
+from app.events import (
+    EVENTS_BY_KIND,
+    EventSpawnContext,
+    RATS_SILO_KIND,
+    try_spawn_event,
+)
 from app.models import PlayerActiveEvent, SystemMessage
 
 
 def test_try_spawn_event_fires_when_eligible_and_roll_succeeds():
     """Eligible context + RNG below spawn_chance must enqueue an active row."""
+    spec = EVENTS_BY_KIND[RATS_SILO_KIND]
     uid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     tick = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
     ctx = EventSpawnContext(latest_food_level=100.0, population_count=20)
@@ -30,8 +36,11 @@ def test_try_spawn_event_fires_when_eligible_and_roll_succeeds():
     assert row.user_id == uid
     assert row.kind == RATS_SILO_KIND
     assert row.started_at == tick
-    assert row.auto_resolve_at == tick + timedelta(seconds=60)
+    assert row.auto_resolve_at == tick + timedelta(seconds=spec.duration_seconds)
 
     msgs = [o for o in captured if isinstance(o, SystemMessage)]
-    assert len(msgs) == 1
-    assert "ALERT" in msgs[0].body
+    if spec.announce_on_start and spec.start_message:
+        assert len(msgs) == 1
+        assert msgs[0].body == spec.start_message
+    else:
+        assert len(msgs) == 0
