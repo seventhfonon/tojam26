@@ -65,8 +65,8 @@ NARRATIVE_MESSAGES: tuple[NarrativeMessage, ...] = (
     NarrativeMessage(
         id="welcome_message",
         text=(
-            "Welcome to Bunker.OS 1.2.0. ",
-            "If you are reading this message, a nuclear apocalypse has occurred. ",
+            "Welcome to Bunker.OS 1.2.0. "
+            "If you are reading this message, a nuclear apocalypse has occurred. "
             "It is not safe to go outside."
         ),
         trigger=_trigger_welcome_message,

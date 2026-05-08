@@ -139,7 +139,10 @@ def _create_player() -> User:
         user_id=user.id,
         lights_on=True,
         crank_workers=0,
-        food_workers=0,
+        food_workers=min(
+            current_app.config["INITIAL_FARM_WORKERS"],
+            current_app.config["INITIAL_POPULATION"],
+        ),
         crop_ready_at=None,
     ))
     db.session.commit()
@@ -383,15 +386,19 @@ def action_harvest_crops():
 
 @bp.route("/farming/crop-status")
 def farming_crop_status():
-    """JSON for Grafana: whether harvest is allowed (crop timer elapsed)."""
+    """JSON for Grafana: harvest eligibility and whether a new plant is allowed."""
     user = _identify_player()
     harvest_ready = False
+    can_plant = False
     if user is not None:
         systems = db.session.get(BunkerSystems, user.id)
-        if systems is not None and systems.crop_ready_at is not None:
-            now = datetime.now(timezone.utc)
-            harvest_ready = now >= systems.crop_ready_at
-    resp = jsonify({"harvest_ready": harvest_ready})
+        if systems is not None:
+            if systems.crop_ready_at is None:
+                can_plant = True
+            else:
+                now = datetime.now(timezone.utc)
+                harvest_ready = now >= systems.crop_ready_at
+    resp = jsonify({"harvest_ready": harvest_ready, "can_plant": can_plant})
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 

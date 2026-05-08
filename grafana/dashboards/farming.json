@@ -3,10 +3,10 @@
   "title": "Silo: Farming",
   "tags": ["silo", "game"],
   "schemaVersion": 39,
-  "version": 2,
+  "version": 7,
   "editable": true,
   "graphTooltip": 1,
-  "time": {"from": "now-1h", "to": "now"},
+  "time": {"from": "now-15m", "to": "now"},
   "refresh": "2s",
   "timepicker": {
     "refresh_intervals": ["1s", "2s", "5s", "10s", "30s", "1m"]
@@ -52,24 +52,25 @@
       "id": 10,
       "type": "text",
       "title": "🌾 Farm management",
-      "description": "Farm workers share the bunker population with power crank workers. Planting starts a 5-minute grow timer before harvest unlocks (+50 food).",
+      "description": "Farm workers share the bunker population with power crank workers. Planting starts a 5-minute grow timer; you cannot plant again until you harvest (+50 food).",
       "datasource": null,
-      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8},
+      "gridPos": {"x": 0, "y": 8, "w": 16, "h": 9},
       "options": {
         "mode": "html",
-        "content": "<style>\n.silo-btn {\n  display: inline-block;\n  padding: 11px 22px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 14px;\n  letter-spacing: 0.4px;\n  font-family: Inter, sans-serif;\n  box-shadow: 0 2px 6px rgba(0,0,0,0.4);\n  transition: opacity 0.15s;\n  color: #fff;\n}\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--green { background: #2ea043; }\n.silo-btn--brown { background: #8b5a2b; }\n.silo-btn--gold { background: #d4a017; }\n.silo-btn--gray   { background: #555; font-size: 18px; padding: 9px 18px; }\n</style>\n<script>\nfunction _siloSyncHarvestBtn() {\n  var b = document.getElementById('_silo_harvest_btn');\n  if (!b) return;\n  fetch('http://localhost:5001/farming/crop-status?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(d) { b.disabled = !d.harvest_ready; })\n    .catch(function() { b.disabled = true; });\n}\nfunction siloAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloSyncHarvestBtn();\n  }, 600);\n}\n_siloSyncHarvestBtn();\nsetInterval(_siloSyncHarvestBtn, 2000);\n</script>\n<div style=\"padding: 20px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;\">\n    <span style=\"color:#888; font-size:13px;\">Farm workers:</span>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=-1')\">&minus;</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=1')\">+</button>\n  </div>\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center;\">\n    <button type=\"button\" class=\"silo-btn silo-btn--brown\" onclick=\"siloAction(this, 'http://localhost:5001/action/plant-crops?user_id=${user_id}')\">🌱 PLANT CROPS</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gold\" id=\"_silo_harvest_btn\" disabled onclick=\"siloAction(this,'http://localhost:5001/action/harvest-crops?user_id=${user_id}')\">🌾 HARVEST (+50)</button>\n  </div>\n  <p style=\"margin:14px 0 0; color:#666; font-size:12px;\">Assigning farm workers does not reduce loyalty. Workers assigned here and on the Power dashboard cannot exceed bunker population.</p>\n</div>"
+        "content": "<style>\n.silo-btn {\n  display: inline-block;\n  padding: 11px 22px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 14px;\n  letter-spacing: 0.4px;\n  font-family: Inter, sans-serif;\n  box-shadow: 0 2px 6px rgba(0,0,0,0.4);\n  transition: opacity 0.15s;\n  color: #fff;\n}\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--green { background: #2ea043; }\n.silo-btn--brown { background: #8b5a2b; }\n.silo-btn--gold { background: #d4a017; }\n.silo-btn--gray   { background: #555; font-size: 18px; padding: 9px 18px; }\n</style>\n<script>\nfunction _siloSyncCropButtons() {\n  var plantBtn = document.getElementById('_silo_plant_btn');\n  var harvestBtn = document.getElementById('_silo_harvest_btn');\n  if (!plantBtn || !harvestBtn) return;\n  fetch('http://localhost:5001/farming/crop-status?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      plantBtn.disabled = !d.can_plant;\n      harvestBtn.disabled = !d.harvest_ready;\n    })\n    .catch(function() {\n      plantBtn.disabled = true;\n      harvestBtn.disabled = true;\n    });\n}\nfunction siloAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloSyncCropButtons();\n  }, 600);\n}\n_siloSyncCropButtons();\nsetInterval(_siloSyncCropButtons, 2000);\n</script>\n<div style=\"padding: 20px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;\">\n    <span style=\"color:#888; font-size:13px;\">Farm workers:</span>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=-1')\">&minus;</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=1')\">+</button>\n  </div>\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center;\">\n    <button type=\"button\" class=\"silo-btn silo-btn--brown\" id=\"_silo_plant_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/plant-crops?user_id=${user_id}')\">🌱 PLANT CROPS</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gold\" id=\"_silo_harvest_btn\" disabled onclick=\"siloAction(this,'http://localhost:5001/action/harvest-crops?user_id=${user_id}')\">🌾 HARVEST (+50)</button>\n  </div>\n  <p style=\"margin:14px 0 0; color:#666; font-size:12px;\">Assigning farm workers does not reduce loyalty. Workers assigned here and on the Power dashboard cannot exceed bunker population.</p>\n</div>"
       }
     },
     {
       "id": 11,
       "type": "stat",
-      "title": "Food stores",
+      "title": "Food",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 0, "y": 16, "w": 8, "h": 5},
+      "gridPos": {"x": 16, "y": 8, "w": 8, "h": 3},
+      "transparent": true,
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "decimals": 1,
+          "decimals": 0,
           "color": {"mode": "thresholds"},
           "thresholds": {
             "mode": "absolute",
@@ -86,7 +87,7 @@
         "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
         "textMode": "auto",
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto"
       },
       "targets": [
@@ -102,9 +103,10 @@
     {
       "id": 12,
       "type": "stat",
-      "title": "Farm workers",
+      "title": "Workers",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 8, "y": 16, "w": 8, "h": 5},
+      "gridPos": {"x": 16, "y": 11, "w": 8, "h": 3},
+      "transparent": true,
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -138,10 +140,11 @@
     {
       "id": 13,
       "type": "stat",
-      "title": "Crop status",
-      "description": "Idle → Growing (5 min) → Ready to harvest.",
+      "title": "Crop",
+      "description": "Idle → Growing → Ready.",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 16, "y": 16, "w": 8, "h": 5},
+      "gridPos": {"x": 16, "y": 14, "w": 8, "h": 3},
+      "transparent": true,
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -187,13 +190,53 @@
     {
       "id": 20,
       "type": "timeseries",
-      "title": "Food stores and flow rates",
-      "description": "Stockpile level and instantaneous consumption (population × 0.1/s) vs farm production (workers × 0.5/s) as recorded each tick.",
+      "title": "Food stores over time",
+      "description": "Total bunker food stockpile from each game tick.",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 0, "y": 21, "w": 24, "h": 10},
+      "gridPos": {"x": 0, "y": 17, "w": 12, "h": 9},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
+          "min": 0,
+          "decimals": 1,
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "single", "sort": "none"}
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, level AS \"Food stores\" FROM food_reserves WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Food production and consumption",
+      "description": "Instantaneous rates (food units per second) stored on each tick: population-driven consumption vs farm-worker production.",
+      "datasource": {"type": "postgres", "uid": "silo-postgres"},
+      "gridPos": {"x": 12, "y": 17, "w": 12, "h": 9},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
           "decimals": 2,
           "color": {"mode": "palette-classic"},
           "custom": {
@@ -206,29 +249,7 @@
             "axisPlacement": "auto"
           }
         },
-        "overrides": [
-          {
-            "matcher": {"id": "byName", "options": "Food stores"},
-            "properties": [
-              {"id": "custom.axisPlacement", "value": "left"},
-              {"id": "unit", "value": "none"}
-            ]
-          },
-          {
-            "matcher": {"id": "byName", "options": "Consumption per s"},
-            "properties": [
-              {"id": "custom.axisPlacement", "value": "right"},
-              {"id": "unit", "value": "none"}
-            ]
-          },
-          {
-            "matcher": {"id": "byName", "options": "Production per s"},
-            "properties": [
-              {"id": "custom.axisPlacement", "value": "right"},
-              {"id": "unit", "value": "none"}
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
@@ -240,17 +261,10 @@
           "datasource": {"type": "postgres", "uid": "silo-postgres"},
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT timestamp AS time, level AS \"Food stores\" FROM food_reserves WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
-        },
-        {
-          "refId": "B",
-          "datasource": {"type": "postgres", "uid": "silo-postgres"},
-          "format": "time_series",
-          "rawQuery": true,
           "rawSql": "SELECT timestamp AS time, consumption_per_second AS \"Consumption per s\" FROM food_reserves WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
         },
         {
-          "refId": "C",
+          "refId": "B",
           "datasource": {"type": "postgres", "uid": "silo-postgres"},
           "format": "time_series",
           "rawQuery": true,
