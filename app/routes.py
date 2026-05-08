@@ -21,7 +21,7 @@ to Grafana as before.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
@@ -30,7 +30,16 @@ from sqlalchemy import select
 
 from .extensions import db
 from .jobs import noisy_radiation_display
-from .models import BunkerLoyalty, BunkerPopulation, BunkerSystems, EnergyReserve, RadiationLevel, SystemMessage, User
+from .models import (
+    BunkerLoyalty,
+    BunkerPopulation,
+    BunkerSystems,
+    EnergyReserve,
+    FoodReserve,
+    RadiationLevel,
+    SystemMessage,
+    User,
+)
 
 
 log = logging.getLogger(__name__)
@@ -120,10 +129,18 @@ def _create_player() -> User:
         user_id=user.id,
         level=current_app.config["INITIAL_ENERGY"],
     ))
+    db.session.add(FoodReserve(
+        user_id=user.id,
+        level=current_app.config["INITIAL_FOOD"],
+        consumption_per_second=0.0,
+        production_per_second=0.0,
+    ))
     db.session.add(BunkerSystems(
         user_id=user.id,
         lights_on=True,
         crank_workers=0,
+        food_workers=0,
+        crop_ready_at=None,
     ))
     db.session.commit()
     return user
@@ -243,10 +260,123 @@ def action_adjust_crank():
 
     systems = db.session.get(BunkerSystems, user.id)
     if systems is not None:
-        systems.crank_workers = max(0, min(systems.crank_workers + delta, max_workers))
+        if delta > 0:
+            systems.crank_workers += 1
+        elif delta < 0:
+            systems.crank_workers -= 1
+        systems.crank_workers = max(0, min(systems.crank_workers, max_workers))
+        while systems.crank_workers + systems.food_workers > max_workers and systems.food_workers > 0:
+            systems.food_workers -= 1
+        if systems.crank_workers + systems.food_workers > max_workers:
+            systems.crank_workers = max(0, max_workers - systems.food_workers)
         systems.updated_at = datetime.now(timezone.utc)
         db.session.commit()
-        log.info("adjust crank workers: user=%s delta=%+d workers=%d", user.id, delta, systems.crank_workers)
+        log.info("adjust crank workers: user=%s delta=%+d crank=%d food=%d", user.id, delta, systems.crank_workers, systems.food_workers)
+
+    return _action_response(user.id)
+
+
+@bp.route("/action/adjust-food")
+def action_adjust_food():
+    """Increment or decrement farm workers (shared population pool with crank)."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    try:
+        delta = int(request.args.get("delta", 0))
+    except (ValueError, TypeError):
+        delta = 0
+
+    latest_pop = db.session.scalars(
+        select(BunkerPopulation)
+        .where(BunkerPopulation.user_id == user.id)
+        .order_by(BunkerPopulation.timestamp.desc())
+        .limit(1)
+    ).first()
+    max_workers = latest_pop.count if latest_pop is not None else 0
+
+    systems = db.session.get(BunkerSystems, user.id)
+    if systems is not None:
+        if delta > 0:
+            systems.food_workers += 1
+        elif delta < 0:
+            systems.food_workers -= 1
+        systems.food_workers = max(0, min(systems.food_workers, max_workers))
+        while systems.crank_workers + systems.food_workers > max_workers and systems.crank_workers > 0:
+            systems.crank_workers -= 1
+        if systems.crank_workers + systems.food_workers > max_workers:
+            systems.food_workers = max(0, max_workers - systems.crank_workers)
+        systems.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        log.info("adjust food workers: user=%s delta=%+d crank=%d food=%d", user.id, delta, systems.crank_workers, systems.food_workers)
+
+    return _action_response(user.id)
+
+
+@bp.route("/action/plant-crops")
+def action_plant_crops():
+    """Start a crop timer; harvest unlocks after ``FARM_PLANT_GROWTH_SECONDS``."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    systems = db.session.get(BunkerSystems, user.id)
+    if systems is not None and systems.crop_ready_at is None:
+        growth = current_app.config["FARM_PLANT_GROWTH_SECONDS"]
+        systems.crop_ready_at = datetime.now(timezone.utc) + timedelta(seconds=growth)
+        systems.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        log.info("plant crops: user=%s ready_at=%s", user.id, systems.crop_ready_at)
+
+    return _action_response(user.id)
+
+
+@bp.route("/action/harvest-crops")
+def action_harvest_crops():
+    """Add harvest yield to food stockpile when the crop timer has elapsed."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    now = datetime.now(timezone.utc)
+    systems = db.session.get(BunkerSystems, user.id)
+    if systems is None or systems.crop_ready_at is None or now < systems.crop_ready_at:
+        return _action_response(user.id)
+
+    latest_food = db.session.scalars(
+        select(FoodReserve)
+        .where(FoodReserve.user_id == user.id)
+        .order_by(FoodReserve.timestamp.desc())
+        .limit(1)
+    ).first()
+    if latest_food is None:
+        return _action_response(user.id)
+
+    latest_pop = db.session.scalars(
+        select(BunkerPopulation)
+        .where(BunkerPopulation.user_id == user.id)
+        .order_by(BunkerPopulation.timestamp.desc())
+        .limit(1)
+    ).first()
+    pop = latest_pop.count if latest_pop is not None else 0
+    consumption_ps = pop * current_app.config["FOOD_PER_CAPITA_PER_SECOND"]
+    production_ps = systems.food_workers * current_app.config["FOOD_PER_WORKER_PER_SECOND"]
+    new_level = latest_food.level + current_app.config["FARM_HARVEST_YIELD"]
+
+    systems.crop_ready_at = None
+    systems.updated_at = now
+    db.session.add(
+        FoodReserve(
+            user_id=user.id,
+            level=new_level,
+            consumption_per_second=consumption_ps,
+            production_per_second=production_ps,
+            timestamp=now,
+        )
+    )
+    db.session.commit()
+    log.info("harvest crops: user=%s food %.1f→%.1f", user.id, latest_food.level, new_level)
 
     return _action_response(user.id)
 

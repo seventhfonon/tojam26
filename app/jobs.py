@@ -11,7 +11,16 @@ from flask import Flask
 from sqlalchemy import select
 
 from .extensions import db
-from .models import BunkerLoyalty, BunkerPopulation, BunkerSystems, EnergyReserve, RadiationLevel, SystemMessage, User
+from .models import (
+    BunkerLoyalty,
+    BunkerPopulation,
+    BunkerSystems,
+    EnergyReserve,
+    FoodReserve,
+    RadiationLevel,
+    SystemMessage,
+    User,
+)
 from .narrative import NarrativeContext, deliver_pending_narrative_messages
 
 
@@ -26,6 +35,7 @@ class GameTickReadings:
     latest_population_sample: BunkerPopulation
     latest_loyalty_sample: BunkerLoyalty
     latest_energy_reserve: EnergyReserve | None
+    latest_food_reserve: FoodReserve | None
     bunker_systems: BunkerSystems | None
 
 
@@ -58,6 +68,13 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         .limit(1)
     ).first()
 
+    latest_food_reserve = db.session.scalars(
+        select(FoodReserve)
+        .where(FoodReserve.user_id == user_id)
+        .order_by(FoodReserve.timestamp.desc())
+        .limit(1)
+    ).first()
+
     bunker_systems = db.session.get(BunkerSystems, user_id)
 
     if (
@@ -72,6 +89,7 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         latest_population_sample=latest_population_sample,
         latest_loyalty_sample=latest_loyalty_sample,
         latest_energy_reserve=latest_energy_reserve,
+        latest_food_reserve=latest_food_reserve,
         bunker_systems=bunker_systems,
     )
 
@@ -176,6 +194,45 @@ def handle_population_departures(
     return departed_count
 
 
+def normalize_worker_assignments(bunker_systems: BunkerSystems, population_cap: int) -> None:
+    """Clamp crank + food workers to ``population_cap`` (shared pool)."""
+    bunker_systems.crank_workers = max(0, min(bunker_systems.crank_workers, population_cap))
+    bunker_systems.food_workers = max(0, min(bunker_systems.food_workers, population_cap))
+    while bunker_systems.crank_workers + bunker_systems.food_workers > population_cap:
+        if bunker_systems.food_workers > 0:
+            bunker_systems.food_workers -= 1
+        else:
+            bunker_systems.crank_workers -= 1
+
+
+def handle_food_reserve_change(
+    user_id: str,
+    current_food_level: float,
+    bunker_systems: BunkerSystems,
+    population_for_consumption: int,
+    elapsed_seconds: float,
+    food_per_capita_per_second: float,
+    food_per_worker_per_second: float,
+    tick_time: datetime,
+) -> None:
+    """Net food change from farm workers vs population consumption (pre-tick headcount)."""
+    consumption_ps = population_for_consumption * food_per_capita_per_second
+    production_ps = bunker_systems.food_workers * food_per_worker_per_second
+    new_level = max(
+        0.0,
+        current_food_level + (production_ps - consumption_ps) * elapsed_seconds,
+    )
+    db.session.add(
+        FoodReserve(
+            user_id=user_id,
+            level=new_level,
+            consumption_per_second=consumption_ps,
+            production_per_second=production_ps,
+            timestamp=tick_time,
+        )
+    )
+
+
 def handle_energy_reserve_change(
     user_id: str,
     latest_energy_reserve: EnergyReserve,
@@ -224,9 +281,12 @@ def game_tick(app: Flask) -> None:
                               (logged in ``user_narrative_deliveries``).
     5. Energy net change    — draw from active systems, generation from crank
                               workers, both scaled by elapsed time.
+    6. Food net change      — farm workers produce; consumption uses *pre-tick*
+                              population headcount (same gating window as other
+                              systems). Worker assignments are normalized to
+                              post-departure population before energy/food.
 
-    All four time series and the BunkerSystems read happen inside a single
-    app_context (one connection, one transaction).
+    Time series and BunkerSystems reads share one app_context transaction.
     """
     with app.app_context():
         decay_half_life_seconds = app.config["DECAY_HALF_LIFE_SECONDS"]
@@ -237,6 +297,8 @@ def game_tick(app: Flask) -> None:
         loyalty_penalty_per_excess_crank_worker = app.config["CRANK_WORKERS_LOYALTY_PENALTY"]
         lights_power_draw_per_second = app.config["LIGHTS_POWER_DRAW"]
         crank_power_per_worker_per_second = app.config["CRANK_POWER_PER_WORKER"]
+        food_per_capita_per_second = app.config["FOOD_PER_CAPITA_PER_SECOND"]
+        food_per_worker_per_second = app.config["FOOD_PER_WORKER_PER_SECOND"]
         tick_time = datetime.now(timezone.utc)
 
         users = db.session.scalars(select(User)).all()
@@ -287,6 +349,10 @@ def game_tick(app: Flask) -> None:
                 tick_time,
             )
 
+            if readings.bunker_systems is not None:
+                post_pop = readings.latest_population_sample.count - departed_this_tick
+                normalize_worker_assignments(readings.bunker_systems, post_pop)
+
             deliver_pending_narrative_messages(
                 NarrativeContext(
                     user_id=user_id,
@@ -307,6 +373,23 @@ def game_tick(app: Flask) -> None:
                     elapsed_seconds,
                     lights_power_draw_per_second,
                     crank_power_per_worker_per_second,
+                    tick_time,
+                )
+
+            if readings.latest_food_reserve is not None:
+                food_start_level = readings.latest_food_reserve.level
+            else:
+                food_start_level = app.config["INITIAL_FOOD"]
+
+            if readings.bunker_systems is not None:
+                handle_food_reserve_change(
+                    user_id,
+                    food_start_level,
+                    readings.bunker_systems,
+                    readings.latest_population_sample.count,
+                    elapsed_seconds,
+                    food_per_capita_per_second,
+                    food_per_worker_per_second,
                     tick_time,
                 )
 

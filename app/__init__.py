@@ -7,7 +7,7 @@ import logging
 import os
 
 from flask import Flask
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from .config import Config
 from .extensions import db, scheduler
@@ -36,6 +36,66 @@ def _ensure_radiation_level_display_column() -> None:
         )
 
 
+def _ensure_bunker_systems_farming_columns() -> None:
+    """Upgrade ``bunker_systems`` for farm workers and crop timers."""
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_systems "
+                "ADD COLUMN IF NOT EXISTS food_workers integer NOT NULL DEFAULT 0"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_systems "
+                "ADD COLUMN IF NOT EXISTS crop_ready_at timestamp with time zone"
+            )
+        )
+
+
+def _ensure_food_reserve_rate_columns() -> None:
+    """Upgrade ``food_reserves`` for per-tick rate columns used by Grafana."""
+    if "food_reserves" not in inspect(db.engine).get_table_names():
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE food_reserves "
+                "ADD COLUMN IF NOT EXISTS consumption_per_second double precision"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE food_reserves "
+                "ADD COLUMN IF NOT EXISTS production_per_second double precision"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE food_reserves SET consumption_per_second = 0 "
+                "WHERE consumption_per_second IS NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE food_reserves SET production_per_second = 0 "
+                "WHERE production_per_second IS NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE food_reserves ALTER COLUMN consumption_per_second "
+                "SET NOT NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE food_reserves ALTER COLUMN production_per_second "
+                "SET NOT NULL"
+            )
+        )
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -46,6 +106,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     with app.app_context():
         db.create_all()
         _ensure_radiation_level_display_column()
+        _ensure_bunker_systems_farming_columns()
+        _ensure_food_reserve_rate_columns()
 
     _maybe_start_scheduler(app)
 

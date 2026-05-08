@@ -77,5 +77,12 @@ class Config:
     # Energy added by a single manual crank button press.
     MANUAL_CRANK_ENERGY = _env_float("MANUAL_CRANK_ENERGY", 1.0)
 
+    # --- Farming ---
+    INITIAL_FOOD = _env_float("INITIAL_FOOD", 1000.0)
+    FOOD_PER_CAPITA_PER_SECOND = _env_float("FOOD_PER_CAPITA_PER_SECOND", 0.1)
+    FOOD_PER_WORKER_PER_SECOND = _env_float("FOOD_PER_WORKER_PER_SECOND", 0.5)
+    FARM_PLANT_GROWTH_SECONDS = _env_int("FARM_PLANT_GROWTH_SECONDS", 300)
+    FARM_HARVEST_YIELD = _env_float("FARM_HARVEST_YIELD", 50.0)
+
     USER_COOKIE_NAME = "silo_user_id"
     USER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365  # 1 year

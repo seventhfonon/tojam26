@@ -51,6 +51,10 @@ class User(db.Model):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    food_samples: Mapped[list["FoodReserve"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     # One row per player; None for legacy users created before this feature.
     bunker_systems: Mapped[Optional["BunkerSystems"]] = relationship(
         back_populates="user",
@@ -192,6 +196,38 @@ class EnergyReserve(db.Model):
         return f"<EnergyReserve user={self.user_id} t={self.timestamp} level={self.level:.2f}>"
 
 
+class FoodReserve(db.Model):
+    """Point-in-time bunker food stockpile and instantaneous economy rates.
+
+    ``consumption_per_second`` and ``production_per_second`` mirror the values
+    used for that tick's delta so Grafana can chart stores vs rates without joins.
+    """
+
+    __tablename__ = "food_reserves"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    level: Mapped[float] = mapped_column(Float, nullable=False)
+    consumption_per_second: Mapped[float] = mapped_column(Float, nullable=False)
+    production_per_second: Mapped[float] = mapped_column(Float, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="food_samples")
+
+    def __repr__(self) -> str:
+        return (
+            f"<FoodReserve user={self.user_id} t={self.timestamp} level={self.level:.1f} "
+            f"cons={self.consumption_per_second:.2f}/s prod={self.production_per_second:.2f}/s>"
+        )
+
+
 class BunkerSystems(db.Model):
     """Current operational state of the bunker's controllable systems.
 
@@ -212,6 +248,10 @@ class BunkerSystems(db.Model):
     )
     lights_on: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     crank_workers: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    food_workers: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    crop_ready_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
@@ -222,7 +262,7 @@ class BunkerSystems(db.Model):
         return (
             f"<BunkerSystems user={self.user_id} "
             f"lights={'on' if self.lights_on else 'off'} "
-            f"crank_workers={self.crank_workers}>"
+            f"crank_workers={self.crank_workers} food_workers={self.food_workers}>"
         )
 
 

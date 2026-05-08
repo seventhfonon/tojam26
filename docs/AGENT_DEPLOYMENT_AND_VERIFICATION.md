@@ -72,6 +72,7 @@ Run from the host after `docker compose up`.
 | New player + redirect | `curl -sS -o /dev/null -w "%{redirect_url}\n" http://localhost:5001/new` | Redirect to Grafana with `d/silo-environment` (or configured UID) and `var-user_id=<uuid>` |
 | Grafana environment dashboard | `curl -sS -o /dev/null -w "%{http_code}\n" "http://localhost:3000/d/silo-environment"` | `200` |
 | Grafana power dashboard | `curl -sS -o /dev/null -w "%{http_code}\n" "http://localhost:3000/d/silo-power"` | `200` |
+| Grafana farming dashboard | `curl -sS -o /dev/null -w "%{http_code}\n" "http://localhost:3000/d/silo-farming"` | `200` |
 
 **System messages API (needs a real UUID from the DB or redirect URL):**
 
@@ -121,18 +122,25 @@ docker compose exec -T db psql -U silo -d silo -c "SELECT level, level_display F
 
 Grafana panels use `COALESCE(level_display, level)`. If Grafana reports “column does not exist”, the DB was never migrated: restart the `web` container (or run `ALTER TABLE radiation_levels ADD COLUMN IF NOT EXISTS level_display double precision` plus `UPDATE radiation_levels SET level_display = level WHERE level_display IS NULL` as `silo`).
 
+**Farming (`food_reserves`, `bunker_systems.food_workers`, `crop_ready_at`):**
+
+```bash
+docker compose exec -T db psql -U silo -d silo -c "\d food_reserves"
+docker compose exec -T db psql -U silo -d silo -c "SELECT level, consumption_per_second, production_per_second FROM food_reserves LIMIT 2;"
+```
+
 Use `-T` on `docker compose exec` when piping to avoid TTY allocation issues.
 
 ---
 
 ## 6. Grafana dashboard JSON
 
-Provisioned dashboards live under `grafana/dashboards/` (currently **`environment.json`** UID `silo-environment`, **`power.json`** UID `silo-power`). Grafana reloads provisioned files on a short interval; bumping the dashboard JSON **`version`** field encourages a faster pick-up after edits.
+Provisioned dashboards live under `grafana/dashboards/` (currently **`environment.json`** UID `silo-environment`, **`power.json`** UID `silo-power`, **`farming.json`** UID `silo-farming`). Grafana reloads provisioned files on a short interval; bumping the dashboard JSON **`version`** field encourages a faster pick-up after edits.
 
 **Validate JSON syntax locally:**
 
 ```bash
-python3 -c "import json; json.load(open('grafana/dashboards/environment.json')); json.load(open('grafana/dashboards/power.json')); print('ok')"
+python3 -c "import json; json.load(open('grafana/dashboards/environment.json')); json.load(open('grafana/dashboards/power.json')); json.load(open('grafana/dashboards/farming.json')); print('ok')"
 ```
 
 ---
