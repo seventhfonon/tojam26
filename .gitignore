@@ -1,0 +1,23 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtualenv
+env/
+venv/
+.venv/
+
+# Local env overrides
+.env
+
+# Editor / OS
+.idea/
+.vscode/
+
+# Docker volumes mounted into host (none right now, but safe to ignore)
+*.sqlite
+*.sqlite3

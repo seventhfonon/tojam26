@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: silo
+      POSTGRES_PASSWORD: silo
+      POSTGRES_DB: silo
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U silo -d silo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    environment:
+      FLASK_SECRET_KEY: dev-secret-change-me
+      DATABASE_URL: postgresql+psycopg://silo:silo@db:5432/silo
+      GRAFANA_URL: http://localhost:3000
+      GRAFANA_DASHBOARD_UID: silo-main
+      INITIAL_RADIATION: "100.0"
+      DECAY_TICK_SECONDS: "30"
+      DECAY_HALF_LIFE_SECONDS: "600"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Host 5001 -> container 5000. macOS uses 5000 for AirPlay Receiver by default,
+    # which is hard to free up; remapping is friendlier than fighting Control Center.
+    ports:
+      - "5001:5000"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      # No-login, anonymous viewer access. Anyone hitting :3000 sees the dashboard.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_BASIC_ENABLED: "false"
+      # Allow embedding under Flask later if we want to reverse-proxy.
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      # Land on our provisioned dashboard by default.
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/radiation.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  grafana_data:
