@@ -32,6 +32,8 @@ class Config:
     # course of a play session while still feeling like an environmental
     # measurement rather than a countdown.
     INITIAL_RADIATION = _env_float("INITIAL_RADIATION", 100.0)
+    # Uniform jitter ± this many rads on ``level_display`` each sample (truth stays in ``level``).
+    RADIATION_DISPLAY_NOISE_MAX = _env_float("RADIATION_DISPLAY_NOISE_MAX", 5.0)
     DECAY_TICK_SECONDS = _env_int("DECAY_TICK_SECONDS", 30)
     DECAY_HALF_LIFE_SECONDS = _env_int("DECAY_HALF_LIFE_SECONDS", 600)
 

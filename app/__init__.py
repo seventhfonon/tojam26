@@ -7,14 +7,33 @@ import logging
 import os
 
 from flask import Flask
+from sqlalchemy import text
 
 from .config import Config
 from .extensions import db, scheduler
-from .jobs import game_tick
+from .jobs import game_tick, post_test_message
 from .routes import bp as main_bp
 
 
 log = logging.getLogger(__name__)
+
+
+def _ensure_radiation_level_display_column() -> None:
+    """Upgrade existing DB volumes that predate ``radiation_levels.level_display``."""
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE radiation_levels "
+                "ADD COLUMN IF NOT EXISTS level_display double precision"
+            )
+        )
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE radiation_levels SET level_display = level "
+                "WHERE level_display IS NULL"
+            )
+        )
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -26,6 +45,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     with app.app_context():
         db.create_all()
+        _ensure_radiation_level_display_column()
 
     _maybe_start_scheduler(app)
 
@@ -51,6 +71,16 @@ def _maybe_start_scheduler(app: Flask) -> None:
         trigger="interval",
         seconds=app.config["DECAY_TICK_SECONDS"],
         id="game_tick",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        func=post_test_message,
+        kwargs={"app": app},
+        trigger="interval",
+        seconds=60,
+        id="post_test_message",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

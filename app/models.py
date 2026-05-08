@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,13 +57,26 @@ class User(db.Model):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    system_messages: Mapped[list["SystemMessage"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    narrative_deliveries: Mapped[list["UserNarrativeDelivery"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.id}>"
 
 
 class RadiationLevel(db.Model):
-    """A single point-in-time outdoor radiation measurement for one player."""
+    """A single point-in-time outdoor radiation measurement for one player.
+
+    ``level`` is the smooth simulated truth used for gameplay (e.g. safe
+    threshold and departures). ``level_display`` is a separate noisy reading
+    (like a Geiger counter) shown in the UI only.
+    """
 
     __tablename__ = "radiation_levels"
 
@@ -78,11 +91,15 @@ class RadiationLevel(db.Model):
         DateTime(timezone=True), default=_utcnow, nullable=False, index=True
     )
     level: Mapped[float] = mapped_column(Float, nullable=False)
+    level_display: Mapped[float] = mapped_column(Float, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="radiation_samples")
 
     def __repr__(self) -> str:
-        return f"<RadiationLevel user={self.user_id} t={self.timestamp} level={self.level:.3f}>"
+        return (
+            f"<RadiationLevel user={self.user_id} t={self.timestamp} "
+            f"level={self.level:.3f} display={self.level_display:.3f}>"
+        )
 
 
 class BunkerPopulation(db.Model):
@@ -207,3 +224,63 @@ class BunkerSystems(db.Model):
             f"lights={'on' if self.lights_on else 'off'} "
             f"crank_workers={self.crank_workers}>"
         )
+
+
+class SystemMessage(db.Model):
+    """A one-way narrative or event message delivered to a player.
+
+    Messages are written by server-side jobs (scripted events, game milestones,
+    alerts) and displayed in the UI as a scrolling terminal log. Body text
+    should be plain ASCII — no HTML, since the frontend will escape it before
+    inserting into the DOM.
+    """
+
+    __tablename__ = "system_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="system_messages")
+
+    def __repr__(self) -> str:
+        return f"<SystemMessage user={self.user_id} t={self.timestamp} body={self.body!r}>"
+
+
+class UserNarrativeDelivery(db.Model):
+    """Records that a scripted narrative line has been delivered to a player.
+
+    Each ``message_id`` corresponds to an entry in ``app.narrative`` (code-defined).
+    A row is inserted the first time the trigger fires; subsequent ticks skip
+    even if conditions would match again.
+    """
+
+    __tablename__ = "user_narrative_deliveries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "message_id", name="uq_user_narrative_message"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    message_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    delivered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="narrative_deliveries")
+
+    def __repr__(self) -> str:
+        return f"<UserNarrativeDelivery user={self.user_id} message_id={self.message_id!r}>"

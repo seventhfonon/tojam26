@@ -3,7 +3,7 @@
   "title": "Silo: Environment",
   "tags": ["silo", "game"],
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "editable": true,
   "graphTooltip": 1,
   "time": {"from": "now-1h", "to": "now"},
@@ -38,12 +38,23 @@
       }
     },
     {
+      "id": 8,
+      "type": "text",
+      "title": "📡 System Messages",
+      "datasource": null,
+      "gridPos": {"x": 0, "y": 3, "w": 24, "h": 5},
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-log {\n  font-family: 'Courier New', monospace;\n  font-size: 12px;\n  background: #0d0d0d;\n  padding: 8px 12px;\n  height: 100%;\n  box-sizing: border-box;\n  overflow-y: auto;\n  display: flex;\n  flex-direction: column;\n  justify-content: flex-end;\n  border-radius: 3px;\n}\n.silo-log .msg { margin: 1px 0; }\n.silo-log .ts { color: #3a3a3a; font-size: 10px; margin-right: 6px; }\n.silo-log .prefix { color: #555; margin-right: 4px; }\n.silo-log .body { color: #8fbc8f; }\n.silo-log .empty { color: #333; font-style: italic; }\n</style>\n<div class=\"silo-log\" id=\"_silo_log\"><span class=\"empty\">Awaiting transmissions...</span></div>\n<script>\nfunction _siloLoadMsgs() {\n  fetch('http://localhost:5001/system-messages?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(msgs) {\n      var el = document.getElementById('_silo_log');\n      if (!msgs || !msgs.length) {\n        el.innerHTML = '<span class=\"empty\">Awaiting transmissions...</span>';\n        return;\n      }\n      el.innerHTML = msgs.map(function(m) {\n        var safe = m.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\n        return '<div class=\"msg\"><span class=\"ts\">[' + m.ts + ']</span><span class=\"prefix\">&gt;</span><span class=\"body\">' + safe + '</span></div>';\n      }).join('');\n      el.scrollTop = el.scrollHeight;\n    })\n    .catch(function() {});\n}\n_siloLoadMsgs();\nsetInterval(_siloLoadMsgs, 5000);\n</script>"
+      }
+    },
+    {
       "id": 2,
       "type": "timeseries",
       "title": "Outdoor radiation (rads)",
-      "description": "Measured external radiation level. The world is recovering, whether the player believes it or not. The orange line marks the threshold below which residents begin reconsidering their stay.",
+      "description": "Outdoor sensor readout (noisy, like a Geiger-style instrument). The orange line marks the threshold below which residents begin reconsidering their stay; gameplay uses the smooth underlying level.",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 0, "y": 3, "w": 24, "h": 10},
+      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 10},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -80,7 +91,7 @@
           "datasource": {"type": "postgres", "uid": "silo-postgres"},
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT timestamp AS time, level AS \"Outdoor radiation\" FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
+          "rawSql": "SELECT timestamp AS time, COALESCE(level_display, level) AS \"Outdoor radiation\" FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
         }
       ]
     },
@@ -89,7 +100,7 @@
       "type": "stat",
       "title": "Radiation",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 0, "y": 13, "w": 8, "h": 5},
+      "gridPos": {"x": 0, "y": 18, "w": 8, "h": 5},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -119,7 +130,7 @@
           "datasource": {"type": "postgres", "uid": "silo-postgres"},
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT timestamp AS time, level FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
+          "rawSql": "SELECT timestamp AS time, COALESCE(level_display, level) FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
         }
       ]
     },
@@ -128,7 +139,7 @@
       "type": "stat",
       "title": "Bunker population",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 8, "y": 13, "w": 8, "h": 5},
+      "gridPos": {"x": 8, "y": 18, "w": 8, "h": 5},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -167,7 +178,7 @@
       "type": "stat",
       "title": "Loyalty",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 16, "y": 13, "w": 8, "h": 5},
+      "gridPos": {"x": 16, "y": 18, "w": 8, "h": 5},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -206,7 +217,7 @@
       "type": "timeseries",
       "title": "Bunker population over time",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 0, "y": 18, "w": 12, "h": 10},
+      "gridPos": {"x": 0, "y": 23, "w": 12, "h": 10},
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -261,7 +272,7 @@
       "type": "timeseries",
       "title": "Loyalty over time",
       "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 12, "y": 18, "w": 12, "h": 10},
+      "gridPos": {"x": 12, "y": 23, "w": 12, "h": 10},
       "fieldConfig": {
         "defaults": {
           "unit": "none",

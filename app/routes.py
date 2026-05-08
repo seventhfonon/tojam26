@@ -25,11 +25,12 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
-from flask import Blueprint, current_app, make_response, redirect, request
+from flask import Blueprint, current_app, jsonify, make_response, redirect, request
 from sqlalchemy import select
 
 from .extensions import db
-from .models import BunkerLoyalty, BunkerPopulation, BunkerSystems, EnergyReserve, RadiationLevel, User
+from .jobs import noisy_radiation_display
+from .models import BunkerLoyalty, BunkerPopulation, BunkerSystems, EnergyReserve, RadiationLevel, SystemMessage, User
 
 
 log = logging.getLogger(__name__)
@@ -99,9 +100,12 @@ def _create_player() -> User:
     """Always mint a fresh UUID and seed all game-state tables."""
     user = User(id=str(uuid4()))
     db.session.add(user)
+    true_rad = current_app.config["INITIAL_RADIATION"]
+    noise_max = current_app.config["RADIATION_DISPLAY_NOISE_MAX"]
     db.session.add(RadiationLevel(
         user_id=user.id,
-        level=current_app.config["INITIAL_RADIATION"],
+        level=true_rad,
+        level_display=noisy_radiation_display(true_rad, noise_max),
     ))
     db.session.add(BunkerPopulation(
         user_id=user.id,
@@ -245,6 +249,32 @@ def action_adjust_crank():
         log.info("adjust crank workers: user=%s delta=%+d workers=%d", user.id, delta, systems.crank_workers)
 
     return _action_response(user.id)
+
+
+@bp.route("/system-messages")
+def system_messages():
+    """Return the 5 most recent system messages for the current player.
+
+    Returns JSON: list of {ts, body} objects ordered oldest-first (so the
+    frontend can render them top-to-bottom with the newest at the bottom).
+    The CORS header allows the Grafana origin to fetch this directly.
+    """
+    user = _identify_player()
+    msgs = []
+    if user is not None:
+        rows = db.session.scalars(
+            select(SystemMessage)
+            .where(SystemMessage.user_id == user.id)
+            .order_by(SystemMessage.timestamp.desc())
+            .limit(5)
+        ).all()
+        msgs = [
+            {"ts": m.timestamp.strftime("%H:%M"), "body": m.body}
+            for m in reversed(rows)
+        ]
+    resp = jsonify(msgs)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
 
 
 @bp.route("/healthz")
