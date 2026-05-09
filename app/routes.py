@@ -33,10 +33,18 @@ from sqlalchemy.orm import selectinload
 
 from .extensions import db
 from . import constants
-from .events import investigation_dispatch_status_payload, try_dispatch_investigation
+from .events import (
+    EventDefinition,
+    combined_rats_consumption_per_second_for_trappers,
+    investigation_dispatch_status_payload,
+    player_has_active_event_kind,
+    rat_trapper_food_production_per_second,
+    try_dispatch_investigation,
+)
 from .jobs import noisy_radiation_display, normalize_worker_assignments
 from .models import (
     BunkerBoredom,
+    BunkerCropPlot,
     BunkerDoubt,
     BunkerFarmingSystem,
     BunkerLightingSystem,
@@ -51,7 +59,13 @@ from .models import (
     SystemMessage,
     User,
 )
-from .professions import PROFESSION_FARMING, PROFESSION_IDLE, PROFESSION_INVESTIGATION, PROFESSION_POWER_CRANK
+from .professions import (
+    PROFESSION_FARMING,
+    PROFESSION_IDLE,
+    PROFESSION_INVESTIGATION,
+    PROFESSION_POWER_CRANK,
+    PROFESSION_RAT_TRAPPING,
+)
 from .social_flavor import NEGATIVE_COUNCIL_MESSAGES, POSITIVE_COUNCIL_MESSAGES
 
 
@@ -77,6 +91,12 @@ def _seed_bunker_facilities(user: User) -> None:
         count=farm_n,
         updated_at=now,
     )
+    rat_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_RAT_TRAPPING,
+        count=0,
+        updated_at=now,
+    )
     idle_line = BunkerProfession(
         user_id=uid,
         profession=PROFESSION_IDLE,
@@ -89,7 +109,7 @@ def _seed_bunker_facilities(user: User) -> None:
         count=0,
         updated_at=now,
     )
-    db.session.add_all([crank_line, farm_line, idle_line, investigation_line])
+    db.session.add_all([crank_line, farm_line, rat_line, idle_line, investigation_line])
     db.session.flush()
     db.session.add(
         BunkerLightingSystem(user_id=uid, lights_on=True, updated_at=now),
@@ -105,10 +125,14 @@ def _seed_bunker_facilities(user: User) -> None:
         BunkerFarmingSystem(
             user_id=uid,
             profession_line_id=farm_line.id,
-            crop_ready_at=None,
+            rat_trapper_line_id=rat_line.id,
             updated_at=now,
         ),
     )
+    for plot_i in range(constants.FARM_PLOT_COUNT):
+        db.session.add(
+            BunkerCropPlot(user_id=uid, plot_index=plot_i, crop_ready_at=None),
+        )
 
 
 def _get_power_crank_system(user_id: str) -> BunkerPowerCrankSystem | None:
@@ -123,8 +147,60 @@ def _get_farming_system(user_id: str) -> BunkerFarmingSystem | None:
     return db.session.scalars(
         select(BunkerFarmingSystem)
         .where(BunkerFarmingSystem.user_id == user_id)
-        .options(selectinload(BunkerFarmingSystem.profession_line))
+        .options(
+            selectinload(BunkerFarmingSystem.profession_line),
+            selectinload(BunkerFarmingSystem.rat_trapper_line),
+        )
     ).first()
+
+
+def _ensure_crop_plots(user_id: str) -> None:
+    """Ensure ``FARM_PLOT_COUNT`` rows exist for this player (migration / legacy gaps)."""
+    if _get_farming_system(user_id) is None:
+        return
+    existing = db.session.scalars(
+        select(BunkerCropPlot.plot_index).where(BunkerCropPlot.user_id == user_id)
+    ).all()
+    have = set(existing)
+    added = False
+    for i in range(constants.FARM_PLOT_COUNT):
+        if i not in have:
+            db.session.add(BunkerCropPlot(user_id=user_id, plot_index=i, crop_ready_at=None))
+            added = True
+    if added:
+        db.session.commit()
+
+
+def _crop_plot_phase(now: datetime, crop_ready_at: datetime | None) -> str:
+    if crop_ready_at is None:
+        return "empty"
+    if now >= crop_ready_at:
+        return "ready"
+    return "growing"
+
+
+def _plot_expected_harvest_yield(
+    plot: BunkerCropPlot | None,
+    now: datetime,
+    current_farm_workers: int,
+) -> float:
+    """Harvest estimate: mean workers over full growth if current assignment holds until harvest."""
+    w_curr = float(max(0, current_farm_workers))
+    if plot is None or plot.crop_ready_at is None:
+        return constants.harvest_yield_from_avg_farm_workers(w_curr)
+    if plot.crop_planted_at is None:
+        return constants.harvest_yield_from_avg_farm_workers(w_curr)
+    duration_total = (plot.crop_ready_at - plot.crop_planted_at).total_seconds()
+    if duration_total <= 0:
+        return constants.harvest_yield_from_avg_farm_workers(w_curr)
+    remaining = max(
+        0.0,
+        (plot.crop_ready_at - max(now, plot.crop_planted_at)).total_seconds(),
+    )
+    projected_avg = (
+        plot.growth_worker_seconds + w_curr * remaining
+    ) / duration_total
+    return constants.harvest_yield_from_avg_farm_workers(projected_avg)
 
 
 def _idle_profession_line(user_id: str) -> BunkerProfession | None:
@@ -401,12 +477,14 @@ def action_adjust_crank():
         or crank_sys.profession_line is None
         or farm_sys is None
         or farm_sys.profession_line is None
+        or farm_sys.rat_trapper_line is None
     ):
         return _action_response(user.id)
 
     now = datetime.now(timezone.utc)
     crank_line = crank_sys.profession_line
     farm_line = farm_sys.profession_line
+    rat_line = farm_sys.rat_trapper_line
 
     if delta > 0:
         crank_line.count += 1
@@ -414,7 +492,7 @@ def action_adjust_crank():
         crank_line.count -= 1
     crank_line.count = max(0, min(crank_line.count, max_workers))
     normalize_worker_assignments(
-        crank_line, farm_line, idle_line, inv_line, max_workers, now
+        crank_line, farm_line, rat_line, idle_line, inv_line, max_workers, now
     )
     crank_sys.updated_at = now
     farm_sys.updated_at = now
@@ -459,12 +537,14 @@ def action_adjust_food():
         or crank_sys.profession_line is None
         or farm_sys is None
         or farm_sys.profession_line is None
+        or farm_sys.rat_trapper_line is None
     ):
         return _action_response(user.id)
 
     now = datetime.now(timezone.utc)
     crank_line = crank_sys.profession_line
     farm_line = farm_sys.profession_line
+    rat_line = farm_sys.rat_trapper_line
 
     if delta > 0:
         farm_line.count += 1
@@ -472,7 +552,7 @@ def action_adjust_food():
         farm_line.count -= 1
     farm_line.count = max(0, min(farm_line.count, max_workers))
     normalize_worker_assignments(
-        crank_line, farm_line, idle_line, inv_line, max_workers, now
+        crank_line, farm_line, rat_line, idle_line, inv_line, max_workers, now
     )
     crank_sys.updated_at = now
     farm_sys.updated_at = now
@@ -488,38 +568,113 @@ def action_adjust_food():
     return _action_response(user.id)
 
 
-@bp.route("/action/plant-crops")
-def action_plant_crops():
-    """Start a crop timer; harvest unlocks after ``FARM_PLANT_GROWTH_SECONDS``."""
+@bp.route("/action/adjust-rat-trappers")
+def action_adjust_rat_trappers():
+    """Increment or decrement rat trappers (same resident pool as crank/farm)."""
     user = _identify_player()
     if user is None:
         return redirect("/new")
 
-    farming = _get_farming_system(user.id)
-    if farming is not None and farming.crop_ready_at is None:
-        growth = constants.FARM_PLANT_GROWTH_SECONDS
-        farming.crop_ready_at = datetime.now(timezone.utc) + timedelta(seconds=growth)
-        farming.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        log.info("plant crops: user=%s ready_at=%s", user.id, farming.crop_ready_at)
+    try:
+        delta = int(request.args.get("delta", 0))
+    except (ValueError, TypeError):
+        delta = 0
+
+    latest_pop = db.session.scalars(
+        select(BunkerPopulation)
+        .where(BunkerPopulation.user_id == user.id)
+        .order_by(BunkerPopulation.timestamp.desc())
+        .limit(1)
+    ).first()
+    max_workers = latest_pop.count if latest_pop is not None else 0
+
+    crank_sys = _get_power_crank_system(user.id)
+    farm_sys = _get_farming_system(user.id)
+    idle_line = _idle_profession_line(user.id)
+    inv_line = _investigation_profession_line(user.id)
+    if (
+        crank_sys is None
+        or crank_sys.profession_line is None
+        or farm_sys is None
+        or farm_sys.profession_line is None
+        or farm_sys.rat_trapper_line is None
+    ):
+        return _action_response(user.id)
+
+    now = datetime.now(timezone.utc)
+    crank_line = crank_sys.profession_line
+    farm_line = farm_sys.profession_line
+    rat_line = farm_sys.rat_trapper_line
+
+    if delta > 0:
+        rat_line.count += 1
+    elif delta < 0:
+        rat_line.count -= 1
+    rat_line.count = max(0, min(rat_line.count, max_workers))
+    normalize_worker_assignments(
+        crank_line, farm_line, rat_line, idle_line, inv_line, max_workers, now
+    )
+    crank_sys.updated_at = now
+    farm_sys.updated_at = now
+    db.session.commit()
+    log.info(
+        "adjust rat trappers: user=%s delta=%+d crank=%d food=%d trappers=%d",
+        user.id,
+        delta,
+        crank_line.count,
+        farm_line.count,
+        rat_line.count,
+    )
 
     return _action_response(user.id)
 
 
-@bp.route("/action/harvest-crops")
-def action_harvest_crops():
-    """Add harvest yield to food stockpile when the crop timer has elapsed."""
+@bp.route("/action/farming-plot")
+def action_farming_plot():
+    """Plant / harvest one bay; harvest food scales with mean farm workers during that growth."""
     user = _identify_player()
     if user is None:
         return redirect("/new")
 
+    raw_plot = request.args.get("plot")
+    try:
+        plot_index = int(raw_plot)
+    except (TypeError, ValueError):
+        return _action_response(user.id)
+
+    if plot_index < 0 or plot_index >= constants.FARM_PLOT_COUNT:
+        return _action_response(user.id)
+
     now = datetime.now(timezone.utc)
     farming = _get_farming_system(user.id)
-    if farming is None or farming.crop_ready_at is None or now < farming.crop_ready_at:
+    if farming is None:
+        return _action_response(user.id)
+
+    _ensure_crop_plots(user.id)
+    plot = db.session.get(BunkerCropPlot, (user.id, plot_index))
+    if plot is None:
+        return _action_response(user.id)
+
+    if plot.crop_ready_at is None:
+        growth = constants.FARM_PLANT_GROWTH_SECONDS
+        plot.crop_ready_at = now + timedelta(seconds=growth)
+        plot.crop_planted_at = now
+        plot.growth_worker_seconds = 0.0
+        farming.updated_at = now
+        db.session.commit()
+        log.info(
+            "farm plot plant: user=%s plot=%s ready_at=%s",
+            user.id,
+            plot_index,
+            plot.crop_ready_at,
+        )
+        return _action_response(user.id)
+
+    if now < plot.crop_ready_at:
         return _action_response(user.id)
 
     farm_line = farming.profession_line
-    food_workers = farm_line.count if farm_line is not None else 0
+    food_workers = float(farm_line.count if farm_line is not None else 0)
 
     latest_food = db.session.scalars(
         select(FoodReserve)
@@ -538,11 +693,29 @@ def action_harvest_crops():
     ).first()
     pop = latest_pop.count if latest_pop is not None else 0
     consumption_ps = pop * constants.FOOD_PER_CAPITA_PER_SECOND
-    production_ps = food_workers * constants.FOOD_PER_WORKER_PER_SECOND
-    new_level = latest_food.level + constants.FARM_HARVEST_YIELD
+    growth_secs = float(constants.FARM_PLANT_GROWTH_SECONDS)
+    if plot.crop_planted_at is not None and plot.crop_ready_at is not None:
+        duration = max(1e-9, (plot.crop_ready_at - plot.crop_planted_at).total_seconds())
+    else:
+        duration = growth_secs
+    avg_workers = plot.growth_worker_seconds / duration
+    if plot.crop_planted_at is None:
+        avg_workers = food_workers
+    harvest_amt = constants.harvest_yield_from_avg_farm_workers(avg_workers)
+    trap_n = farming.rat_trapper_line.count if farming.rat_trapper_line is not None else 0
+    player_row = db.session.get(User, user.id)
+    bg = float(player_row.rat_background_consumption_ps) if player_row is not None else 0.0
+    introduced = bool(player_row.silo_rats_introduced) if player_row is not None else False
+    swarm_active = introduced and player_has_active_event_kind(user.id, EventDefinition.RATS_SILO)
+    combined_rat = combined_rats_consumption_per_second_for_trappers(pop, bg, swarm_active)
+    trap_prod = rat_trapper_food_production_per_second(trap_n, combined_rat)
+    production_ps = constants.FOOD_PER_WORKER_PER_SECOND * food_workers + trap_prod
 
-    farming.crop_ready_at = None
+    plot.crop_ready_at = None
+    plot.crop_planted_at = None
+    plot.growth_worker_seconds = 0.0
     farming.updated_at = now
+    new_level = latest_food.level + harvest_amt
     db.session.add(
         FoodReserve(
             user_id=user.id,
@@ -553,7 +726,15 @@ def action_harvest_crops():
         )
     )
     db.session.commit()
-    log.info("harvest crops: user=%s food %.1f→%.1f", user.id, latest_food.level, new_level)
+    log.info(
+        "farm plot harvest: user=%s plot=%s food %.1f->%.1f (+%.1f avg_workers=%.2f)",
+        user.id,
+        plot_index,
+        latest_food.level,
+        new_level,
+        harvest_amt,
+        avg_workers,
+    )
 
     return _action_response(user.id)
 
@@ -715,19 +896,76 @@ def socials_action_status():
 
 @bp.route("/farming/crop-status")
 def farming_crop_status():
-    """JSON for Grafana: harvest eligibility and whether a new plant is allowed."""
+    """JSON for Grafana: each hydro plot's phase (empty / growing / ready)."""
+    growth = constants.FARM_PLANT_GROWTH_SECONDS
+    harvest_yield = constants.FARM_HARVEST_YIELD
+    harvest_ref_workers = constants.FARM_HARVEST_YIELD_REF_AVG_WORKERS
+    plot_count = constants.FARM_PLOT_COUNT
+    plot_columns = constants.FARM_PLOT_GRID_COLUMNS
+
+    def payload(plots: list[dict]) -> dict:
+        return {
+            "plots": plots,
+            "growth_seconds": growth,
+            "harvest_yield": harvest_yield,
+            "harvest_yield_ref_workers": harvest_ref_workers,
+            "plot_columns": plot_columns,
+        }
+
+    empty_plots = [
+        {
+            "plot": i,
+            "phase": "empty",
+            "ready_at": None,
+            "expected_yield": round(
+                constants.harvest_yield_from_avg_farm_workers(0.0), 2
+            ),
+        }
+        for i in range(plot_count)
+    ]
+
     user = _identify_player()
-    harvest_ready = False
-    can_plant = False
-    if user is not None:
-        farming = _get_farming_system(user.id)
-        if farming is not None:
-            if farming.crop_ready_at is None:
-                can_plant = True
-            else:
-                now = datetime.now(timezone.utc)
-                harvest_ready = now >= farming.crop_ready_at
-    resp = jsonify({"harvest_ready": harvest_ready, "can_plant": can_plant})
+    if user is None:
+        resp = jsonify(payload(empty_plots))
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+
+    if _get_farming_system(user.id) is None:
+        resp = jsonify(payload(empty_plots))
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+
+    _ensure_crop_plots(user.id)
+    now = datetime.now(timezone.utc)
+    rows = db.session.scalars(
+        select(BunkerCropPlot)
+        .where(BunkerCropPlot.user_id == user.id)
+        .order_by(BunkerCropPlot.plot_index)
+    ).all()
+    by_idx = {r.plot_index: r for r in rows}
+
+    farming = _get_farming_system(user.id)
+    farm_line = farming.profession_line if farming is not None else None
+    farm_workers = farm_line.count if farm_line is not None else 0
+
+    plots_out: list[dict] = []
+    for i in range(plot_count):
+        row = by_idx.get(i)
+        ready_at = row.crop_ready_at if row else None
+        phase = _crop_plot_phase(now, ready_at)
+        exp_yield = _plot_expected_harvest_yield(row, now, farm_workers)
+        plots_out.append(
+            {
+                "plot": i,
+                "phase": phase,
+                "ready_at": ready_at.isoformat().replace("+00:00", "Z")
+                if ready_at
+                else None,
+                "expected_yield": round(exp_yield, 2),
+            }
+        )
+
+    resp = jsonify(payload(plots_out))
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
@@ -742,11 +980,13 @@ def worker_assignment_status():
                 "population": 0,
                 "crank_workers": 0,
                 "farm_workers": 0,
+                "rat_trapper_workers": 0,
                 "investigation_workers": 0,
                 "idle_workers": 0,
                 "can_hire": False,
                 "can_fire_crank": False,
                 "can_fire_farm": False,
+                "can_fire_rat_trapper": False,
             }
         )
         resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -768,12 +1008,21 @@ def worker_assignment_status():
 
     crank_workers = crank_line.count if crank_line is not None else 0
     farm_workers = farm_line.count if farm_line is not None else 0
+    rat_line = farm_sys.rat_trapper_line if farm_sys is not None else None
+    rat_trapper_workers = rat_line.count if rat_line is not None else 0
     inv_line = _investigation_profession_line(user.id)
     investigation_workers = inv_line.count if inv_line is not None else 0
     idle_workers = (
         idle_line.count
         if idle_line is not None
-        else max(0, population - crank_workers - farm_workers - investigation_workers)
+        else max(
+            0,
+            population
+            - crank_workers
+            - farm_workers
+            - rat_trapper_workers
+            - investigation_workers,
+        )
     )
 
     facilities_ready = (
@@ -781,23 +1030,23 @@ def worker_assignment_status():
         and farm_sys is not None
         and crank_line is not None
         and farm_line is not None
+        and rat_line is not None
     )
-    can_hire = (
-        facilities_ready
-        and population > 0
-        and (crank_workers + farm_workers + investigation_workers < population)
-    )
+    assigned = crank_workers + farm_workers + rat_trapper_workers + investigation_workers
+    can_hire = facilities_ready and population > 0 and assigned < population
 
     resp = jsonify(
         {
             "population": population,
             "crank_workers": crank_workers,
             "farm_workers": farm_workers,
+            "rat_trapper_workers": rat_trapper_workers,
             "investigation_workers": investigation_workers,
             "idle_workers": idle_workers,
             "can_hire": can_hire,
             "can_fire_crank": crank_workers > 0,
             "can_fire_farm": farm_workers > 0,
+            "can_fire_rat_trapper": rat_trapper_workers > 0,
         }
     )
     resp.headers["Access-Control-Allow-Origin"] = "*"

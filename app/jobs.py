@@ -6,7 +6,7 @@ import logging
 import random
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask
 from sqlalchemy import select
@@ -16,6 +16,7 @@ from .extensions import db
 from . import constants
 from .models import (
     BunkerBoredom,
+    BunkerCropPlot,
     BunkerDoubt,
     BunkerFarmingSystem,
     BunkerLightingSystem,
@@ -36,13 +37,17 @@ from .professions import (
     PROFESSION_IDLE,
     PROFESSION_INVESTIGATION,
     PROFESSION_POWER_CRANK,
+    PROFESSION_RAT_TRAPPING,
 )
 from .events import (
-    EventSpawnContext,
-    active_event_food_multiplier,
-    active_event_row,
+    EventDefinition,
+    active_event_tick_effects,
     auto_resolve_if_due,
+    combined_rats_consumption_per_second_for_trappers,
     finalize_investigation_if_due,
+    player_has_active_event_kind,
+    player_has_any_active_event,
+    rat_trapper_food_production_per_second,
     try_spawn_event,
 )
 from .narrative import NarrativeContext, deliver_pending_narrative_messages
@@ -102,6 +107,23 @@ class GameTickReadings:
     farming: BunkerFarmingSystem | None
     idle_profession: BunkerProfession | None
     investigation_profession: BunkerProfession | None
+    user: User
+
+
+def drift_rat_background_consumption(user: User, elapsed_seconds: float) -> None:
+    """Random-walk silo rat drain after ``rats_silo_intro`` (scaled for catch-up ticks)."""
+    if not user.silo_rats_introduced:
+        return
+    scale = min(3.0, max(0.0, elapsed_seconds))
+    step = float(constants.RAT_BACKGROUND_DRIFT_STEP_PS) * scale
+    user.rat_background_consumption_ps += random.uniform(-step, step)
+    user.rat_background_consumption_ps = max(
+        float(constants.RAT_BACKGROUND_DRAIN_MIN_PS),
+        min(
+            float(constants.RAT_BACKGROUND_DRAIN_MAX_PS),
+            user.rat_background_consumption_ps,
+        ),
+    )
 
 
 def _investigation_worker_count(readings: GameTickReadings) -> int:
@@ -122,6 +144,12 @@ def _farm_worker_count(readings: GameTickReadings) -> int:
     return readings.farming.profession_line.count
 
 
+def _rat_trapper_count(readings: GameTickReadings) -> int:
+    if readings.farming is None or readings.farming.rat_trapper_line is None:
+        return 0
+    return readings.farming.rat_trapper_line.count
+
+
 def _lights_on(readings: GameTickReadings) -> bool:
     if readings.lighting is None:
         return True
@@ -135,6 +163,7 @@ def _facilities_ready(readings: GameTickReadings) -> bool:
         and readings.power_crank.profession_line is not None
         and readings.farming is not None
         and readings.farming.profession_line is not None
+        and readings.farming.rat_trapper_line is not None
     )
 
 
@@ -197,7 +226,10 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
     farming = db.session.scalars(
         select(BunkerFarmingSystem)
         .where(BunkerFarmingSystem.user_id == user_id)
-        .options(selectinload(BunkerFarmingSystem.profession_line))
+        .options(
+            selectinload(BunkerFarmingSystem.profession_line),
+            selectinload(BunkerFarmingSystem.rat_trapper_line),
+        )
     ).first()
     idle_profession = db.session.scalars(
         select(BunkerProfession).where(
@@ -221,6 +253,10 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
     ):
         return None
 
+    user_row = db.session.get(User, user_id)
+    if user_row is None:
+        return None
+
     return GameTickReadings(
         latest_radiation_level=latest_radiation_level,
         latest_population_sample=latest_population_sample,
@@ -234,6 +270,7 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         farming=farming,
         idle_profession=idle_profession,
         investigation_profession=investigation_profession,
+        user=user_row,
     )
 
 
@@ -241,10 +278,16 @@ def elapsed_seconds_for_game_tick(
     tick_time: datetime,
     latest_radiation_level: RadiationLevel,
 ) -> float | None:
+    """Wall-clock delta since last radiation sample.
+
+    Returns ``0.0`` when timestamps coincide (same-second ticks) so the tick still
+    runs (random events, decay at zero step). Only negative deltas return
+    ``None`` (clock skew / duplicate row ordering).
+    """
     elapsed_seconds = (tick_time - latest_radiation_level.timestamp).total_seconds()
-    if elapsed_seconds <= 0:
+    if elapsed_seconds < 0:
         return None
-    return elapsed_seconds
+    return max(0.0, elapsed_seconds)
 
 
 def noisy_radiation_display(true_level: float, noise_max: float) -> float:
@@ -385,29 +428,39 @@ def handle_population_departures(
 def normalize_worker_assignments(
     crank_line: BunkerProfession | None,
     farm_line: BunkerProfession | None,
+    rat_trapper_line: BunkerProfession | None,
     idle_line: BunkerProfession | None,
     investigation_line: BunkerProfession | None,
     population_cap: int,
     tick_time: datetime,
 ) -> None:
-    """Clamp crank + farm to shared pool minus Investigation; refresh Idle."""
+    """Clamp crank, farm, rat trappers to shared pool minus Investigation; refresh Idle."""
     inv_n = investigation_line.count if investigation_line is not None else 0
     inv_n = max(0, inv_n)
     pool = max(0, population_cap - inv_n)
-    if crank_line is None or farm_line is None:
+    if crank_line is None or farm_line is None or rat_trapper_line is None:
         return
     crank_line.count = max(0, min(crank_line.count, pool))
     farm_line.count = max(0, min(farm_line.count, pool))
-    while crank_line.count + farm_line.count > pool:
+    rat_trapper_line.count = max(0, min(rat_trapper_line.count, pool))
+    while crank_line.count + farm_line.count + rat_trapper_line.count > pool:
         if farm_line.count > 0:
             farm_line.count -= 1
+        elif rat_trapper_line.count > 0:
+            rat_trapper_line.count -= 1
         else:
             crank_line.count -= 1
     crank_line.updated_at = tick_time
     farm_line.updated_at = tick_time
+    rat_trapper_line.updated_at = tick_time
     if idle_line is not None:
         idle_line.count = max(
-            0, population_cap - crank_line.count - farm_line.count - inv_n
+            0,
+            population_cap
+            - crank_line.count
+            - farm_line.count
+            - rat_trapper_line.count
+            - inv_n,
         )
         idle_line.updated_at = tick_time
 
@@ -421,15 +474,17 @@ def record_bunker_profession_snapshots(
     """Append profession rows (crank, farming, investigation, idle) for Grafana."""
     crank = _crank_worker_count(readings)
     farm = _farm_worker_count(readings)
+    rat_n = _rat_trapper_count(readings)
     inv = _investigation_worker_count(readings)
     idle_count = (
         readings.idle_profession.count
         if readings.idle_profession is not None
-        else max(0, population - crank - farm - inv)
+        else max(0, population - crank - farm - rat_n - inv)
     )
     for profession, count in (
         (PROFESSION_POWER_CRANK, crank),
         (PROFESSION_FARMING, farm),
+        (PROFESSION_RAT_TRAPPING, rat_n),
         (PROFESSION_INVESTIGATION, inv),
         (PROFESSION_IDLE, idle_count),
     ):
@@ -443,6 +498,40 @@ def record_bunker_profession_snapshots(
         )
 
 
+def accumulate_growing_crop_worker_seconds(
+    user_id: str,
+    farm_workers: int,
+    elapsed_seconds: float,
+    tick_time: datetime,
+) -> None:
+    """Credit farm-worker×Δt only for wall-clock overlap with each crop's growth window.
+
+    ``elapsed_seconds`` is the full simulation step (since the last radiation sample).
+    A newly planted crop must not receive credit for time before ``crop_planted_at``,
+    otherwise worker-seconds include pre-plant time and inflate mean workers at harvest.
+    """
+    if elapsed_seconds <= 0:
+        return
+    plots = db.session.scalars(
+        select(BunkerCropPlot).where(BunkerCropPlot.user_id == user_id)
+    ).all()
+    window_start = tick_time - timedelta(seconds=elapsed_seconds)
+    fw = float(farm_workers)
+    for plot in plots:
+        if plot.crop_ready_at is None or plot.crop_planted_at is None:
+            continue
+        planted = plot.crop_planted_at
+        ready = plot.crop_ready_at
+        overlap_start = max(planted, window_start)
+        overlap_end = min(tick_time, ready)
+        if overlap_end <= overlap_start:
+            continue
+        dt = (overlap_end - overlap_start).total_seconds()
+        if dt <= 0:
+            continue
+        plot.growth_worker_seconds += fw * dt
+
+
 def handle_food_reserve_change(
     user_id: str,
     current_food_level: float,
@@ -453,12 +542,15 @@ def handle_food_reserve_change(
     food_per_worker_per_second: float,
     tick_time: datetime,
     food_consumption_multiplier: float = 1.0,
+    rat_trapper_production_ps: float = 0.0,
+    rat_background_consumption_ps: float = 0.0,
 ) -> None:
-    """Net food change from farm workers vs population consumption (pre-tick headcount)."""
+    """Net food change: human consumption plus resident rats, minus trapper salvage."""
     consumption_ps = (
         population_for_consumption * food_per_capita_per_second * food_consumption_multiplier
+        + rat_background_consumption_ps
     )
-    production_ps = farm_workers * food_per_worker_per_second
+    production_ps = farm_workers * food_per_worker_per_second + rat_trapper_production_ps
     new_level = max(
         0.0,
         current_food_level + (production_ps - consumption_ps) * elapsed_seconds,
@@ -527,12 +619,9 @@ def game_tick(app: Flask) -> None:
                               (logged in ``user_narrative_deliveries``).
     6. Energy net change    — draw from active systems, generation from crank
                               workers, both scaled by elapsed time.
-    7. Food net change      — farm workers produce; consumption uses *pre-tick*
-                              population headcount (same gating window as other
-                              systems). Worker assignments are normalized to
-                              post-departure population before energy/food.
-                              Active random events may multiply consumption only.
-    7. Loyalty sample       — records crank-adjusted loyalty plus any auto-resolve
+    7. Food net change      — human consumption × optional swarm mult plus fluctuating
+                              resident rat drain; trapper salvage scales with combined rat drain.
+    8. Loyalty sample       — records crank-adjusted loyalty plus any auto-resolve
                               loyalty delta from step 0.
 
     Time series and split facility reads share one app_context transaction.
@@ -584,13 +673,13 @@ def game_tick(app: Flask) -> None:
                 spawn_food = constants.INITIAL_FOOD
             try_spawn_event(
                 user_id,
-                EventSpawnContext(
-                    latest_food_level=spawn_food,
-                    population_count=readings.latest_population_sample.count,
-                ),
+                spawn_food,
+                readings.latest_population_sample.count,
+                _rat_trapper_count(readings),
                 tick_time,
             )
-            food_mult = active_event_food_multiplier(user_id)
+            food_mult = active_event_tick_effects(user_id, tick_time).food_consumption_multiplier
+            drift_rat_background_consumption(readings.user, elapsed_seconds)
 
             handle_radiation_decay(
                 user_id,
@@ -649,13 +738,25 @@ def game_tick(app: Flask) -> None:
                 if readings.farming is not None
                 else None
             )
+            rat_line = (
+                readings.farming.rat_trapper_line
+                if readings.farming is not None
+                else None
+            )
             if _facilities_ready(readings):
                 normalize_worker_assignments(
                     crank_line,
                     farm_line,
+                    rat_line,
                     readings.idle_profession,
                     readings.investigation_profession,
                     post_pop,
+                    tick_time,
+                )
+                accumulate_growing_crop_worker_seconds(
+                    user_id,
+                    _farm_worker_count(readings),
+                    elapsed_seconds,
                     tick_time,
                 )
                 if readings.power_crank is not None:
@@ -694,6 +795,21 @@ def game_tick(app: Flask) -> None:
                 food_start_level = constants.INITIAL_FOOD
 
             if _facilities_ready(readings):
+                swarm_active = player_has_active_event_kind(user_id, EventDefinition.RATS_SILO)
+                combined_rat = combined_rats_consumption_per_second_for_trappers(
+                    readings.latest_population_sample.count,
+                    readings.user.rat_background_consumption_ps,
+                    swarm_active,
+                )
+                trap_prod = rat_trapper_food_production_per_second(
+                    _rat_trapper_count(readings),
+                    combined_rat,
+                )
+                rat_bg_consume = (
+                    readings.user.rat_background_consumption_ps
+                    if readings.user.silo_rats_introduced
+                    else 0.0
+                )
                 handle_food_reserve_change(
                     user_id,
                     food_start_level,
@@ -704,12 +820,14 @@ def game_tick(app: Flask) -> None:
                     food_per_worker_per_second,
                     tick_time,
                     food_consumption_multiplier=food_mult,
+                    rat_trapper_production_ps=trap_prod,
+                    rat_background_consumption_ps=rat_bg_consume,
                 )
 
             final_loyalty = max(0.0, min(100.0, adjusted_loyalty + auto_loyalty_adj))
             record_loyalty_sample(user_id, final_loyalty, tick_time)
 
-            ev_row = active_event_row(user_id)
+            ev_active = player_has_any_active_event(user_id)
             energy_val = readings.latest_energy_reserve
             gamestate_snapshots.append(
                 {
@@ -724,7 +842,7 @@ def game_tick(app: Flask) -> None:
                         else "na"
                     ),
                     "departed_tick": departed_this_tick,
-                    "hidden_pressure_active": ev_row is not None,
+                    "hidden_pressure_active": ev_active,
                     "food_mult": food_mult,
                     "crank_workers": _crank_worker_count(readings),
                     "food_workers": _farm_worker_count(readings),

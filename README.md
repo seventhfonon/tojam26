@@ -111,8 +111,8 @@ pytest                         # full suite (needs Postgres on `DATABASE_URL`)
 All knobs live in `app/constants.py` (radiation decay, population, energy,
 farming, social, scheduler tick interval, etc.). Code imports that module
 directly — it is not mirrored on `current_app.config`. Random gameplay event
-numbers (spawn odds, durations, loyalty deltas, eligibility thresholds,
-messages) live on each `GameEventSpec` in `app/events.py`, not in `constants.py`.
+numbers (spawn odds, durations, callable tick-effect bundles, spawn gates, and
+outcome helpers) live on each `GameEventSpec` in `app/events.py`, not in `constants.py`.
 
 With the defaults, a fresh player sees a smooth decay curve dropping from 100
 to ~50 over ten minutes, ~25 over twenty, etc. — slow enough to feel like an

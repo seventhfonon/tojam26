@@ -42,6 +42,12 @@ class User(db.Model):
     investigation_target_system: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True
     )
+    #: ``rats_silo_intro`` has fired — resident rats add ongoing fluctuating food drain.
+    silo_rats_introduced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Instantaneous extra food consumption from resident rats (food units per second).
+    rat_background_consumption_ps: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0
+    )
 
     radiation_samples: Mapped[list["RadiationLevel"]] = relationship(
         back_populates="user",
@@ -108,10 +114,13 @@ class User(db.Model):
         cascade="all, delete-orphan",
         uselist=False,
     )
-    active_game_event: Mapped[Optional["PlayerActiveEvent"]] = relationship(
+    active_game_events: Mapped[list["PlayerActiveEvent"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
-        uselist=False,
+    )
+    crop_plots: Mapped[list["BunkerCropPlot"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
@@ -353,8 +362,8 @@ class FoodReserve(db.Model):
 class BunkerProfession(db.Model):
     """Mutable headcount for one profession slot (one row per user per profession).
 
-    Worker-assigned bunker systems reference the row for ``Power crank`` or
-    ``Farming`` instead of storing a duplicate count. ``Idle`` has no system row.
+    Worker-assigned bunker systems reference the row for ``Power crank``,
+    ``Farming``, or ``Rat trapping`` (silo defense). ``Idle`` has no system row.
     Tick snapshots copy these counts into :class:`BunkerProfessionSnapshot`.
     """
 
@@ -383,6 +392,12 @@ class BunkerProfession(db.Model):
     )
     farming_slot: Mapped[Optional["BunkerFarmingSystem"]] = relationship(
         back_populates="profession_line",
+        foreign_keys="[BunkerFarmingSystem.profession_line_id]",
+        uselist=False,
+    )
+    rat_trapping_slot: Mapped[Optional["BunkerFarmingSystem"]] = relationship(
+        back_populates="rat_trapper_line",
+        foreign_keys="[BunkerFarmingSystem.rat_trapper_line_id]",
         uselist=False,
     )
 
@@ -443,7 +458,10 @@ class BunkerPowerCrankSystem(db.Model):
 
 
 class BunkerFarmingSystem(db.Model):
-    """Hydroponics / farm station; worker headcount on :attr:`profession_line`."""
+    """Hydroponics / farm station; farm workers on :attr:`profession_line`, trappers on :attr:`rat_trapper_line`.
+
+    Crop timers live per plot on :class:`BunkerCropPlot`.
+    """
 
     __tablename__ = "bunker_farming_systems"
 
@@ -457,8 +475,10 @@ class BunkerFarmingSystem(db.Model):
         nullable=False,
         unique=True,
     )
-    crop_ready_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    rat_trapper_line_id: Mapped[int] = mapped_column(
+        ForeignKey("bunker_professions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
@@ -469,11 +489,44 @@ class BunkerFarmingSystem(db.Model):
         back_populates="farming_slot",
         foreign_keys=[profession_line_id],
     )
+    rat_trapper_line: Mapped[BunkerProfession] = relationship(
+        back_populates="rat_trapping_slot",
+        foreign_keys=[rat_trapper_line_id],
+    )
 
     def __repr__(self) -> str:
         return (
-            f"<BunkerFarmingSystem user={self.user_id} line={self.profession_line_id} "
-            f"crop_ready_at={self.crop_ready_at}>"
+            f"<BunkerFarmingSystem user={self.user_id} farm_line={self.profession_line_id} "
+            f"rat_line={self.rat_trapper_line_id}>"
+        )
+
+
+class BunkerCropPlot(db.Model):
+    """One hydroponic plot; ``crop_ready_at`` set while crops mature."""
+
+    __tablename__ = "bunker_crop_plots"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    plot_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    crop_ready_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    crop_planted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: Riemann sum of (farm workers × Δt) while this plot is growing (reset on plant).
+    growth_worker_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+    user: Mapped[User] = relationship(back_populates="crop_plots")
+
+    def __repr__(self) -> str:
+        return (
+            f"<BunkerCropPlot user={self.user_id} plot={self.plot_index} "
+            f"ready={self.crop_ready_at}>"
         )
 
 
@@ -534,18 +587,26 @@ class SystemMessage(db.Model):
 
 
 class PlayerActiveEvent(db.Model):
-    """At most one random gameplay event per player (PK on ``user_id``).
+    """Concurrent random gameplay events per player (one row per active definition).
 
-    While present, event handlers adjust simulation (e.g. food consumption)
-    until ``auto_resolve_at`` or until the player resolves via an action.
+    Rows are removed when the event auto-resolves or is cleared via investigation.
     """
 
     __tablename__ = "player_active_events"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kind", name="uq_player_active_events_user_kind"),
+    )
 
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
     user_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         ForeignKey("users.id", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
+        index=True,
     )
     kind: Mapped[str] = mapped_column(String(64), nullable=False)
     started_at: Mapped[datetime] = mapped_column(
@@ -557,11 +618,11 @@ class PlayerActiveEvent(db.Model):
     #: Optional subsystem this event belongs to; sweep dispatch can clear it when ids match.
     system: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
-    user: Mapped[User] = relationship(back_populates="active_game_event")
+    user: Mapped[User] = relationship(back_populates="active_game_events")
 
     def __repr__(self) -> str:
         return (
-            f"<PlayerActiveEvent user={self.user_id} kind={self.kind!r} "
+            f"<PlayerActiveEvent id={self.id!r} user={self.user_id} kind={self.kind!r} "
             f"system={self.system!r} until={self.auto_resolve_at}>"
         )
 

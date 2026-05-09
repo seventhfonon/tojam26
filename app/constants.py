@@ -1,7 +1,8 @@
 """Game tuning — single source of truth. Import ``app.constants`` in routes, jobs, etc.
 
 Infrastructure (DB URL, secrets, Grafana base URL) lives in ``app.config.Config``.
-Random gameplay event numbers live on each ``GameEventSpec`` in ``app.events``.
+Random subsystem events are defined as ``GameEventSpec`` rows in ``app.events``
+(callable spawn gates and outcomes plus numeric odds/durations/multipliers).
 """
 
 from __future__ import annotations
@@ -110,9 +111,34 @@ MANUAL_CRANK_ENERGY = 1.0
 INITIAL_FOOD = 1000.0
 INITIAL_FARM_WORKERS = 10
 FOOD_PER_CAPITA_PER_SECOND = 0.1
-FOOD_PER_WORKER_PER_SECOND = 1
+# Farm workers no longer add passive food each tick; they only affect per-plot harvest size.
+FOOD_PER_WORKER_PER_SECOND = 0.0
+# Continuous trapper output (/sec) = trapper_count × this × combined_rat_pressure_ps.
+# Combined pressure = fluctuating silo rat drain + swarm spike marginal while ``rats_silo`` is active.
+RAT_TRAPPER_PRODUCTION_PER_TRAP_PRESSURE_UNIT = 0.1
+# After ``rats_silo_intro``: resident rats add ongoing drain (food units/sec), drifted each tick.
+RAT_BACKGROUND_INITIAL_DRAIN_PS = 0.018
+# Uniform random drift amplitude per second of tick elapsed (scaled below ~3 s catch-up).
+RAT_BACKGROUND_DRIFT_STEP_PS = 0.006
+RAT_BACKGROUND_DRAIN_MIN_PS = 0.004
+RAT_BACKGROUND_DRAIN_MAX_PS = 0.055
 FARM_PLANT_GROWTH_SECONDS = 300
+# Harvest food when average assigned farm workers during the growth window equals this reference.
 FARM_HARVEST_YIELD = 50.0
+FARM_HARVEST_YIELD_REF_AVG_WORKERS = 10.0
+# Independent hydroponic bays on the farming dashboard (columns × rows).
+FARM_PLOT_GRID_COLUMNS = 2
+FARM_PLOT_GRID_ROWS = 2
+FARM_PLOT_COUNT = FARM_PLOT_GRID_COLUMNS * FARM_PLOT_GRID_ROWS
+
+
+def harvest_yield_from_avg_farm_workers(avg_workers: float) -> float:
+    """Food from one harvest given mean farm-worker headcount over that crop's growth window."""
+    ref = FARM_HARVEST_YIELD_REF_AVG_WORKERS
+    if ref <= 0:
+        return 0.0
+    return max(0.0, FARM_HARVEST_YIELD * (float(avg_workers) / ref))
+
 
 # Periodic INFO summaries from ``game_tick`` (seconds between logs); 0 = off.
 GAMESTATE_LOG_INTERVAL_SECONDS = 10

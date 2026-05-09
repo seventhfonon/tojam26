@@ -6,7 +6,7 @@
     "game"
   ],
   "schemaVersion": 39,
-  "version": 9,
+  "version": 10,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -446,6 +446,65 @@
       ]
     },
     {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Population employment over time",
+      "description": "Worker assignments recorded each game tick from bunker_profession_snapshots (Power crank, Farming, Investigation detail, Idle). Step chart reflects hires, fires, and sweep deployments.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, profession AS metric, count::double precision AS value FROM bunker_profession_snapshots WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
+        }
+      ]
+    },
+    {
       "id": 6,
       "type": "timeseries",
       "title": "Bunker population over time",
@@ -455,7 +514,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 43,
         "w": 12,
         "h": 10
       },
@@ -551,7 +610,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 34,
+        "y": 43,
         "w": 12,
         "h": 10
       },

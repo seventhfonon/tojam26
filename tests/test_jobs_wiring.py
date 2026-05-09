@@ -25,11 +25,11 @@ def test_jobs_imports_random_event_hooks():
     import app.jobs as jobs
 
     required = (
-        "EventSpawnContext",
-        "active_event_food_multiplier",
-        "active_event_row",
+        "active_event_tick_effects",
         "auto_resolve_if_due",
         "finalize_investigation_if_due",
+        "player_has_active_event_kind",
+        "player_has_any_active_event",
         "try_spawn_event",
     )
     for name in required:

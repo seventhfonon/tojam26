@@ -65,14 +65,16 @@ def _migrate_legacy_bunker_systems_table() -> None:
     if "bunker_systems" not in insp.get_table_names():
         return
 
+    from .constants import FARM_PLOT_COUNT
     from .models import (
+        BunkerCropPlot,
         BunkerFarmingSystem,
         BunkerLightingSystem,
         BunkerPopulation,
         BunkerPowerCrankSystem,
         BunkerProfession,
     )
-    from .professions import PROFESSION_FARMING, PROFESSION_IDLE, PROFESSION_POWER_CRANK
+    from .professions import PROFESSION_FARMING, PROFESSION_IDLE, PROFESSION_POWER_CRANK, PROFESSION_RAT_TRAPPING
 
     with db.engine.connect() as conn:
         legacy_rows = conn.execute(
@@ -118,7 +120,13 @@ def _migrate_legacy_bunker_systems_table() -> None:
             count=idle_n,
             updated_at=now,
         )
-        db.session.add_all([crank_line, farm_line, idle_line])
+        rat_line = BunkerProfession(
+            user_id=uid,
+            profession=PROFESSION_RAT_TRAPPING,
+            count=0,
+            updated_at=now,
+        )
+        db.session.add_all([crank_line, farm_line, rat_line, idle_line])
         db.session.flush()
 
         updated_legacy = row["updated_at"] or now
@@ -140,10 +148,19 @@ def _migrate_legacy_bunker_systems_table() -> None:
             BunkerFarmingSystem(
                 user_id=uid,
                 profession_line_id=farm_line.id,
-                crop_ready_at=row["crop_ready_at"],
+                rat_trapper_line_id=rat_line.id,
                 updated_at=updated_legacy,
             )
         )
+
+        for plot_i in range(FARM_PLOT_COUNT):
+            db.session.add(
+                BunkerCropPlot(
+                    user_id=uid,
+                    plot_index=plot_i,
+                    crop_ready_at=row["crop_ready_at"] if plot_i == 0 else None,
+                )
+            )
 
     db.session.commit()
 
@@ -340,6 +357,178 @@ def _ensure_investigation_profession_lines() -> None:
         )
 
 
+def _migrate_bunker_crop_plots_schema() -> None:
+    """Create per-plot crop rows and drop legacy ``crop_ready_at`` on farming facilities."""
+    from .constants import FARM_PLOT_COUNT
+
+    insp = inspect(db.engine)
+    tables = set(insp.get_table_names())
+    if "bunker_crop_plots" not in tables:
+        return
+
+    last_plot = FARM_PLOT_COUNT - 1
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO bunker_crop_plots (user_id, plot_index, crop_ready_at)
+                SELECT f.user_id, gs.i, NULL::timestamptz
+                FROM bunker_farming_systems f
+                CROSS JOIN generate_series(0, :last_plot) AS gs(i)
+                ON CONFLICT (user_id, plot_index) DO NOTHING
+                """
+            ),
+            {"last_plot": last_plot},
+        )
+
+    if "bunker_farming_systems" not in tables:
+        return
+    cols = {c["name"] for c in insp.get_columns("bunker_farming_systems")}
+    if "crop_ready_at" not in cols:
+        return
+
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE bunker_crop_plots p
+                SET crop_ready_at = f.crop_ready_at
+                FROM bunker_farming_systems f
+                WHERE p.user_id = f.user_id
+                  AND p.plot_index = 0
+                  AND f.crop_ready_at IS NOT NULL
+                """
+            )
+        )
+        conn.execute(
+            text("ALTER TABLE bunker_farming_systems DROP COLUMN crop_ready_at")
+        )
+
+
+def _ensure_bunker_crop_plot_growth_tracking_columns() -> None:
+    """Per-plot crop growth window + ∫(farm_workers dt) for harvest yield scaling."""
+    from .constants import FARM_PLANT_GROWTH_SECONDS
+
+    insp = inspect(db.engine)
+    if "bunker_crop_plots" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("bunker_crop_plots")}
+    with db.engine.begin() as conn:
+        if "crop_planted_at" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE bunker_crop_plots "
+                    "ADD COLUMN crop_planted_at TIMESTAMPTZ"
+                )
+            )
+        if "growth_worker_seconds" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE bunker_crop_plots "
+                    "ADD COLUMN growth_worker_seconds DOUBLE PRECISION NOT NULL DEFAULT 0"
+                )
+            )
+        conn.execute(
+            text(
+                """
+                UPDATE bunker_crop_plots
+                SET crop_planted_at = crop_ready_at - (:sec * INTERVAL '1 second')
+                WHERE crop_ready_at IS NOT NULL AND crop_planted_at IS NULL
+                """
+            ),
+            {"sec": FARM_PLANT_GROWTH_SECONDS},
+        )
+
+
+def _ensure_farming_rat_trapper_lines() -> None:
+    """Second farming FK + Rat trapping profession rows for legacy installs."""
+    insp = inspect(db.engine)
+    tables = set(insp.get_table_names())
+    if "bunker_farming_systems" not in tables or "bunker_professions" not in tables:
+        return
+    cols_meta = insp.get_columns("bunker_farming_systems")
+    cols = {c["name"] for c in cols_meta}
+    if "rat_trapper_line_id" not in cols:
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE bunker_farming_systems "
+                    "ADD COLUMN rat_trapper_line_id INTEGER UNIQUE "
+                    "REFERENCES bunker_professions(id)"
+                )
+            )
+
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO bunker_professions (user_id, profession, count, updated_at)
+                SELECT f.user_id, 'Rat trapping', 0, now()
+                FROM bunker_farming_systems f
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM bunker_professions bp
+                    WHERE bp.user_id = f.user_id AND bp.profession = 'Rat trapping'
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE bunker_farming_systems f
+                SET rat_trapper_line_id = bp.id
+                FROM bunker_professions bp
+                WHERE bp.user_id = f.user_id
+                  AND bp.profession = 'Rat trapping'
+                  AND f.rat_trapper_line_id IS NULL
+                """
+            )
+        )
+
+    cols_meta = inspect(db.engine).get_columns("bunker_farming_systems")
+    rat_col = next((c for c in cols_meta if c["name"] == "rat_trapper_line_id"), None)
+    if rat_col is None or rat_col.get("nullable") is False:
+        return
+    with db.engine.connect() as conn:
+        remaining = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM bunker_farming_systems WHERE rat_trapper_line_id IS NULL"
+            )
+        ).scalar_one()
+    if remaining != 0:
+        log.warning(
+            "bunker_farming_systems has %s row(s) without rat_trapper_line_id; NOT NULL skipped",
+            remaining,
+        )
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_farming_systems "
+                "ALTER COLUMN rat_trapper_line_id SET NOT NULL"
+            )
+        )
+
+
+def _ensure_user_rat_infestation_columns() -> None:
+    """Resident rat intro flag + fluctuating silo drain (units/sec)."""
+    if "users" not in inspect(db.engine).get_table_names():
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS silo_rats_introduced "
+                "BOOLEAN NOT NULL DEFAULT false"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS rat_background_consumption_ps "
+                "DOUBLE PRECISION NOT NULL DEFAULT 0"
+            )
+        )
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -355,10 +544,14 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_food_reserve_rate_columns()
         _ensure_bunker_social_seed_data()
         _migrate_legacy_bunker_systems_table()
+        _migrate_bunker_crop_plots_schema()
+        _ensure_bunker_crop_plot_growth_tracking_columns()
         _ensure_player_active_events_system_column()
         _ensure_users_investigation_target_system_column()
         _migrate_investigation_timer_to_users()
         _ensure_investigation_profession_lines()
+        _ensure_farming_rat_trapper_lines()
+        _ensure_user_rat_infestation_columns()
 
     _maybe_start_scheduler(app)
 

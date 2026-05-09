@@ -6,7 +6,7 @@
     "game"
   ],
   "schemaVersion": 39,
-  "version": 13,
+  "version": 25,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -75,20 +75,632 @@
       }
     },
     {
-      "id": 10,
+      "id": 28,
       "type": "text",
-      "title": "\ud83c\udf3e Farm management",
-      "description": "Farm workers share the bunker population with power crank workers. Planting starts a 5-minute grow timer; you cannot plant again until you harvest (+50 food).",
+      "title": "",
       "datasource": null,
       "gridPos": {
         "x": 0,
         "y": 8,
-        "w": 16,
-        "h": 9
+        "w": 7,
+        "h": 3
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.silo-btn {\n  display: inline-block;\n  padding: 11px 22px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 14px;\n  letter-spacing: 0.4px;\n  font-family: Inter, sans-serif;\n  box-shadow: 0 2px 6px rgba(0,0,0,0.4);\n  transition: opacity 0.15s;\n  color: #fff;\n}\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--green { background: #2ea043; }\n.silo-btn--brown { background: #8b5a2b; }\n.silo-btn--gold { background: #d4a017; }\n.silo-btn--gray   { background: #555; font-size: 18px; padding: 9px 18px; }\n.silo-btn--orange { background: #e67e00; }\n</style>\n<script>\nfunction _siloSyncCropButtons() {\n  var plantBtn = document.getElementById('_silo_plant_btn');\n  var harvestBtn = document.getElementById('_silo_harvest_btn');\n  if (!plantBtn || !harvestBtn) return;\n  fetch('http://localhost:5001/farming/crop-status?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      plantBtn.disabled = !d.can_plant;\n      harvestBtn.disabled = !d.harvest_ready;\n    })\n    .catch(function() {\n      plantBtn.disabled = true;\n      harvestBtn.disabled = true;\n    });\n}\nfunction _siloSyncInvestigateBtn() {\n  var btn = document.getElementById('_silo_investigate_btn');\n  var hint = document.getElementById('_silo_inv_hint');\n  if (!btn) return;\n  fetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}&system=farming')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      btn.disabled = !d.can_dispatch;\n      if (hint) hint.textContent = 'Requires ' + d.team_required + ' idle residents (unassigned to crank, farm, or sweep).';\n    })\n    .catch(function() { btn.disabled = true; });\n}\nfunction _siloSyncFarmWorkerButtons() {\n  var hire = document.getElementById('_silo_farm_hire_btn');\n  var fire = document.getElementById('_silo_farm_fire_btn');\n  if (!hire || !fire) return;\n  fetch('http://localhost:5001/systems/worker-assignment-status?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      hire.disabled = !d.can_hire;\n      fire.disabled = !d.can_fire_farm;\n    })\n    .catch(function() {\n      hire.disabled = true;\n      fire.disabled = true;\n    });\n}\nfunction siloAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloSyncCropButtons();\n    _siloSyncFarmWorkerButtons();\n    _siloSyncInvestigateBtn();\n  }, 600);\n}\n_siloSyncCropButtons();\n_siloSyncInvestigateBtn();\n_siloSyncFarmWorkerButtons();\nsetInterval(_siloSyncCropButtons, 2000);\nsetInterval(_siloSyncInvestigateBtn, 2000);\nsetInterval(_siloSyncFarmWorkerButtons, 2000);\n</script>\n<div style=\"padding: 20px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 14px;\">\n    <span style=\"color:#888; font-size:13px;\">Farm workers:</span>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" id=\"_silo_farm_fire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=-1')\">&minus;</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" id=\"_silo_farm_hire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=1')\">+</button>\n  </div>\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center;\">\n    <button type=\"button\" class=\"silo-btn silo-btn--brown\" id=\"_silo_plant_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/plant-crops?user_id=${user_id}')\">\ud83c\udf31 PLANT CROPS</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gold\" id=\"_silo_harvest_btn\" disabled onclick=\"siloAction(this,'http://localhost:5001/action/harvest-crops?user_id=${user_id}')\">\ud83c\udf3e HARVEST (+50)</button>\n  </div>\n  <div style=\"margin-top:18px; padding-top:14px; border-top:1px solid #333;\">\n  <p style=\"margin:0 0 10px; color:#c9a227; font-size:13px; font-weight:600;\">Routine compartment sweep</p>\n  <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_investigate_btn\" disabled onclick=\"siloAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=farming')\">Send investigation team</button>\n  <p id=\"_silo_inv_hint\" style=\"margin:10px 0 0; color:#666; font-size:11px;\"></p>\n</div>\n<p style=\"margin:14px 0 0; color:#666; font-size:12px;\">Assigning farm workers does not reduce loyalty. Workers assigned here and on the Power dashboard cannot exceed bunker population.</p>\n</div>"
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--green{background:#2ea043}\n.plot-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.plot-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n.plot-status{font-size:11px;color:#6e7681;margin-bottom:8px;min-height:14px}\n</style>\n<script>\n(function(){\nvar PLOT=0;\nvar bid=\"_silo_crop_btn_0\";\nvar lid=\"_silo_crop_lbl_0\";\nvar fid=\"_silo_crop_frame_0\";\nfunction syncPlot(){\nfetch('http://localhost:5001/farming/crop-status?user_id=${user_id}')\n.then(function(r){return r.json();})\n.then(function(d){\nvar p=(d.plots||[])[PLOT];\nvar btn=document.getElementById(bid);\nvar lbl=document.getElementById(lid);\nif(!btn||!lbl)return;\nif(!p){btn.disabled=true;lbl.textContent=\"\\u2014\";return;}\nbtn.disabled=(p.phase==='growing');\nif(p.phase==='empty'){btn.textContent='Plant';lbl.textContent='Fallow';}\nelse if(p.phase==='growing'){btn.textContent='Growing\\u2026';lbl.textContent='Maturing';}\nelse{btn.textContent='Harvest';lbl.textContent='Ready';}\n})\n.catch(function(){var b=document.getElementById(bid);if(b)b.disabled=true;});\n}\nwindow.silo_crop_go_0=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){btn.disabled=false;syncPlot();},600);\n};\nsyncPlot();\nsetInterval(syncPlot,2000);\n})();\n</script>\n<div class=\"plot-wrap\">\n  <div class=\"plot-cell-head\">Plot 1</div>\n  <div class=\"plot-status\" id=\"_silo_crop_lbl_0\">\u2014</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--green\" id=\"_silo_crop_btn_0\" disabled onclick='window.silo_crop_go_0(this, \"http://localhost:5001/action/farming-plot?user_id=${user_id}&plot=0\")'>Plant</button>\n</div>"
+      }
+    },
+    {
+      "id": 29,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 7,
+        "h": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--green{background:#2ea043}\n.plot-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.plot-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n.plot-status{font-size:11px;color:#6e7681;margin-bottom:8px;min-height:14px}\n</style>\n<script>\n(function(){\nvar PLOT=1;\nvar bid=\"_silo_crop_btn_1\";\nvar lid=\"_silo_crop_lbl_1\";\nvar fid=\"_silo_crop_frame_1\";\nfunction syncPlot(){\nfetch('http://localhost:5001/farming/crop-status?user_id=${user_id}')\n.then(function(r){return r.json();})\n.then(function(d){\nvar p=(d.plots||[])[PLOT];\nvar btn=document.getElementById(bid);\nvar lbl=document.getElementById(lid);\nif(!btn||!lbl)return;\nif(!p){btn.disabled=true;lbl.textContent=\"\\u2014\";return;}\nbtn.disabled=(p.phase==='growing');\nif(p.phase==='empty'){btn.textContent='Plant';lbl.textContent='Fallow';}\nelse if(p.phase==='growing'){btn.textContent='Growing\\u2026';lbl.textContent='Maturing';}\nelse{btn.textContent='Harvest';lbl.textContent='Ready';}\n})\n.catch(function(){var b=document.getElementById(bid);if(b)b.disabled=true;});\n}\nwindow.silo_crop_go_1=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){btn.disabled=false;syncPlot();},600);\n};\nsyncPlot();\nsetInterval(syncPlot,2000);\n})();\n</script>\n<div class=\"plot-wrap\">\n  <div class=\"plot-cell-head\">Plot 2</div>\n  <div class=\"plot-status\" id=\"_silo_crop_lbl_1\">\u2014</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--green\" id=\"_silo_crop_btn_1\" disabled onclick='window.silo_crop_go_1(this, \"http://localhost:5001/action/farming-plot?user_id=${user_id}&plot=1\")'>Plant</button>\n</div>"
+      }
+    },
+    {
+      "id": 30,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 7,
+        "h": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--green{background:#2ea043}\n.plot-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.plot-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n.plot-status{font-size:11px;color:#6e7681;margin-bottom:8px;min-height:14px}\n</style>\n<script>\n(function(){\nvar PLOT=2;\nvar bid=\"_silo_crop_btn_2\";\nvar lid=\"_silo_crop_lbl_2\";\nvar fid=\"_silo_crop_frame_2\";\nfunction syncPlot(){\nfetch('http://localhost:5001/farming/crop-status?user_id=${user_id}')\n.then(function(r){return r.json();})\n.then(function(d){\nvar p=(d.plots||[])[PLOT];\nvar btn=document.getElementById(bid);\nvar lbl=document.getElementById(lid);\nif(!btn||!lbl)return;\nif(!p){btn.disabled=true;lbl.textContent=\"\\u2014\";return;}\nbtn.disabled=(p.phase==='growing');\nif(p.phase==='empty'){btn.textContent='Plant';lbl.textContent='Fallow';}\nelse if(p.phase==='growing'){btn.textContent='Growing\\u2026';lbl.textContent='Maturing';}\nelse{btn.textContent='Harvest';lbl.textContent='Ready';}\n})\n.catch(function(){var b=document.getElementById(bid);if(b)b.disabled=true;});\n}\nwindow.silo_crop_go_2=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){btn.disabled=false;syncPlot();},600);\n};\nsyncPlot();\nsetInterval(syncPlot,2000);\n})();\n</script>\n<div class=\"plot-wrap\">\n  <div class=\"plot-cell-head\">Plot 3</div>\n  <div class=\"plot-status\" id=\"_silo_crop_lbl_2\">\u2014</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--green\" id=\"_silo_crop_btn_2\" disabled onclick='window.silo_crop_go_2(this, \"http://localhost:5001/action/farming-plot?user_id=${user_id}&plot=2\")'>Plant</button>\n</div>"
+      }
+    },
+    {
+      "id": 31,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 7,
+        "h": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--green{background:#2ea043}\n.plot-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.plot-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n.plot-status{font-size:11px;color:#6e7681;margin-bottom:8px;min-height:14px}\n</style>\n<script>\n(function(){\nvar PLOT=3;\nvar bid=\"_silo_crop_btn_3\";\nvar lid=\"_silo_crop_lbl_3\";\nvar fid=\"_silo_crop_frame_3\";\nfunction syncPlot(){\nfetch('http://localhost:5001/farming/crop-status?user_id=${user_id}')\n.then(function(r){return r.json();})\n.then(function(d){\nvar p=(d.plots||[])[PLOT];\nvar btn=document.getElementById(bid);\nvar lbl=document.getElementById(lid);\nif(!btn||!lbl)return;\nif(!p){btn.disabled=true;lbl.textContent=\"\\u2014\";return;}\nbtn.disabled=(p.phase==='growing');\nif(p.phase==='empty'){btn.textContent='Plant';lbl.textContent='Fallow';}\nelse if(p.phase==='growing'){btn.textContent='Growing\\u2026';lbl.textContent='Maturing';}\nelse{btn.textContent='Harvest';lbl.textContent='Ready';}\n})\n.catch(function(){var b=document.getElementById(bid);if(b)b.disabled=true;});\n}\nwindow.silo_crop_go_3=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){btn.disabled=false;syncPlot();},600);\n};\nsyncPlot();\nsetInterval(syncPlot,2000);\n})();\n</script>\n<div class=\"plot-wrap\">\n  <div class=\"plot-cell-head\">Plot 4</div>\n  <div class=\"plot-status\" id=\"_silo_crop_lbl_3\">\u2014</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--green\" id=\"_silo_crop_btn_3\" disabled onclick='window.silo_crop_go_3(this, \"http://localhost:5001/action/farming-plot?user_id=${user_id}&plot=3\")'>Plant</button>\n</div>"
+      }
+    },
+    {
+      "type": "bargauge",
+      "description": "Progress toward harvest for this bay (0\u2013100%). Growth duration is 300s \u2014 keep in sync with `FARM_PLANT_GROWTH_SECONDS` in `app/constants.py`.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 37,
+      "title": "Plot 1 growth",
+      "gridPos": {
+        "x": 7,
+        "y": 8,
+        "w": 11,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN crop_ready_at IS NULL THEN 0::double precision\n    WHEN crop_ready_at <= NOW() THEN 100::double precision\n    ELSE LEAST(\n      100::double precision,\n      GREATEST(\n        0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (NOW() - (crop_ready_at - INTERVAL '300 seconds'))) / 300.0\n      )\n    )\n  END AS progress\nFROM bunker_crop_plots\nWHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND plot_index = 0"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.001
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 46,
+      "title": "Plot 1 Estimated Yield",
+      "description": "Estimated harvest for this bay: current worker assignment if fallow; otherwise running average during growth. Align 50/10 with `FARM_HARVEST_YIELD` / `FARM_HARVEST_YIELD_REF_AVG_WORKERS`.",
+      "gridPos": {
+        "x": 18,
+        "y": 8,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN p.crop_ready_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    WHEN p.crop_planted_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    ELSE\n      GREATEST(0::double precision, 50.0::double precision * (\n        (\n          p.growth_worker_seconds::double precision\n          + COALESCE(bp.count, 0)::double precision\n            * GREATEST(\n                0::double precision,\n                EXTRACT(EPOCH FROM (p.crop_ready_at - GREATEST(NOW(), p.crop_planted_at)))\n              )\n        )\n        / GREATEST(\n          EXTRACT(EPOCH FROM (p.crop_ready_at - p.crop_planted_at)),\n          1e-9\n        )\n      ) / 10.0::double precision)\n  END AS expected_yield\nFROM bunker_crop_plots p\nLEFT JOIN bunker_farming_systems fs ON fs.user_id = p.user_id\nLEFT JOIN bunker_professions bp ON bp.id = fs.profession_line_id\nWHERE '$user_id' <> '' AND p.user_id = '$user_id'::uuid AND plot_index = 0"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "description": "Progress toward harvest for this bay (0\u2013100%). Growth duration is 300s \u2014 keep in sync with `FARM_PLANT_GROWTH_SECONDS` in `app/constants.py`.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 38,
+      "title": "Plot 2 growth",
+      "gridPos": {
+        "x": 7,
+        "y": 11,
+        "w": 11,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN crop_ready_at IS NULL THEN 0::double precision\n    WHEN crop_ready_at <= NOW() THEN 100::double precision\n    ELSE LEAST(\n      100::double precision,\n      GREATEST(\n        0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (NOW() - (crop_ready_at - INTERVAL '300 seconds'))) / 300.0\n      )\n    )\n  END AS progress\nFROM bunker_crop_plots\nWHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND plot_index = 1"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.001
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 47,
+      "title": "Plot 2 Estimated Yield",
+      "description": "Estimated harvest for this bay: current worker assignment if fallow; otherwise running average during growth. Align 50/10 with `FARM_HARVEST_YIELD` / `FARM_HARVEST_YIELD_REF_AVG_WORKERS`.",
+      "gridPos": {
+        "x": 18,
+        "y": 11,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN p.crop_ready_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    WHEN p.crop_planted_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    ELSE\n      GREATEST(0::double precision, 50.0::double precision * (\n        (\n          p.growth_worker_seconds::double precision\n          + COALESCE(bp.count, 0)::double precision\n            * GREATEST(\n                0::double precision,\n                EXTRACT(EPOCH FROM (p.crop_ready_at - GREATEST(NOW(), p.crop_planted_at)))\n              )\n        )\n        / GREATEST(\n          EXTRACT(EPOCH FROM (p.crop_ready_at - p.crop_planted_at)),\n          1e-9\n        )\n      ) / 10.0::double precision)\n  END AS expected_yield\nFROM bunker_crop_plots p\nLEFT JOIN bunker_farming_systems fs ON fs.user_id = p.user_id\nLEFT JOIN bunker_professions bp ON bp.id = fs.profession_line_id\nWHERE '$user_id' <> '' AND p.user_id = '$user_id'::uuid AND plot_index = 1"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "description": "Progress toward harvest for this bay (0\u2013100%). Growth duration is 300s \u2014 keep in sync with `FARM_PLANT_GROWTH_SECONDS` in `app/constants.py`.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 39,
+      "title": "Plot 3 growth",
+      "gridPos": {
+        "x": 7,
+        "y": 14,
+        "w": 11,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN crop_ready_at IS NULL THEN 0::double precision\n    WHEN crop_ready_at <= NOW() THEN 100::double precision\n    ELSE LEAST(\n      100::double precision,\n      GREATEST(\n        0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (NOW() - (crop_ready_at - INTERVAL '300 seconds'))) / 300.0\n      )\n    )\n  END AS progress\nFROM bunker_crop_plots\nWHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND plot_index = 2"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.001
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 48,
+      "title": "Plot 3 Estimated Yield",
+      "description": "Estimated harvest for this bay: current worker assignment if fallow; otherwise running average during growth. Align 50/10 with `FARM_HARVEST_YIELD` / `FARM_HARVEST_YIELD_REF_AVG_WORKERS`.",
+      "gridPos": {
+        "x": 18,
+        "y": 14,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN p.crop_ready_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    WHEN p.crop_planted_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    ELSE\n      GREATEST(0::double precision, 50.0::double precision * (\n        (\n          p.growth_worker_seconds::double precision\n          + COALESCE(bp.count, 0)::double precision\n            * GREATEST(\n                0::double precision,\n                EXTRACT(EPOCH FROM (p.crop_ready_at - GREATEST(NOW(), p.crop_planted_at)))\n              )\n        )\n        / GREATEST(\n          EXTRACT(EPOCH FROM (p.crop_ready_at - p.crop_planted_at)),\n          1e-9\n        )\n      ) / 10.0::double precision)\n  END AS expected_yield\nFROM bunker_crop_plots p\nLEFT JOIN bunker_farming_systems fs ON fs.user_id = p.user_id\nLEFT JOIN bunker_professions bp ON bp.id = fs.profession_line_id\nWHERE '$user_id' <> '' AND p.user_id = '$user_id'::uuid AND plot_index = 2"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "description": "Progress toward harvest for this bay (0\u2013100%). Growth duration is 300s \u2014 keep in sync with `FARM_PLANT_GROWTH_SECONDS` in `app/constants.py`.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 40,
+      "title": "Plot 4 growth",
+      "gridPos": {
+        "x": 7,
+        "y": 17,
+        "w": 11,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN crop_ready_at IS NULL THEN 0::double precision\n    WHEN crop_ready_at <= NOW() THEN 100::double precision\n    ELSE LEAST(\n      100::double precision,\n      GREATEST(\n        0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (NOW() - (crop_ready_at - INTERVAL '300 seconds'))) / 300.0\n      )\n    )\n  END AS progress\nFROM bunker_crop_plots\nWHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND plot_index = 3"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.001
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 49,
+      "title": "Plot 4 Estimated Yield",
+      "description": "Estimated harvest for this bay: current worker assignment if fallow; otherwise running average during growth. Align 50/10 with `FARM_HARVEST_YIELD` / `FARM_HARVEST_YIELD_REF_AVG_WORKERS`.",
+      "gridPos": {
+        "x": 18,
+        "y": 17,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN p.crop_ready_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    WHEN p.crop_planted_at IS NULL THEN\n      GREATEST(0::double precision, 50.0::double precision * (COALESCE(bp.count, 0)::double precision / 10.0))\n    ELSE\n      GREATEST(0::double precision, 50.0::double precision * (\n        (\n          p.growth_worker_seconds::double precision\n          + COALESCE(bp.count, 0)::double precision\n            * GREATEST(\n                0::double precision,\n                EXTRACT(EPOCH FROM (p.crop_ready_at - GREATEST(NOW(), p.crop_planted_at)))\n              )\n        )\n        / GREATEST(\n          EXTRACT(EPOCH FROM (p.crop_ready_at - p.crop_planted_at)),\n          1e-9\n        )\n      ) / 10.0::double precision)\n  END AS expected_yield\nFROM bunker_crop_plots p\nLEFT JOIN bunker_farming_systems fs ON fs.user_id = p.user_id\nLEFT JOIN bunker_professions bp ON bp.id = fs.profession_line_id\nWHERE '$user_id' <> '' AND p.user_id = '$user_id'::uuid AND plot_index = 3"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "text",
+      "title": "\ud83c\udf3e Farm management",
+      "description": "Farm workers and rat trappers share the bunker population with power crank workers. Four hydro bays (2\u00d72); harvest size scales with mean farm workers during each crop's growth window.",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 16,
+        "h": 14
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:11px 22px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:14px;letter-spacing:.4px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:opacity .15s;color:#fff}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--gray{background:#555;font-size:18px;padding:9px 18px}\n.silo-btn--orange{background:#e67e00}\n</style>\n<script>\nfunction _siloSyncInvestigateBtn(){\nvar btn=document.getElementById('_silo_investigate_btn');\nvar hint=document.getElementById('_silo_inv_hint');\nif(!btn)return;\nfetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}&system=farming')\n.then(function(r){return r.json();})\n.then(function(d){\nbtn.disabled=!d.can_dispatch;\nif(hint)hint.textContent='Requires '+d.team_required+' idle residents (unassigned to crank, farm, rat traps, or sweep).';\n})\n.catch(function(){btn.disabled=true;});\n}\nfunction _siloSyncFarmStaff(){\nvar hire=document.getElementById('_silo_farm_hire_btn');\nvar fire=document.getElementById('_silo_farm_fire_btn');\nvar rh=document.getElementById('_silo_trap_hire_btn');\nvar rf=document.getElementById('_silo_trap_fire_btn');\nvar fl=document.getElementById('_silo_farm_count_lbl');\nvar tl=document.getElementById('_silo_trap_count_lbl');\nif(!hire||!fire)return;\nfetch('http://localhost:5001/systems/worker-assignment-status?user_id=${user_id}')\n.then(function(r){return r.json();})\n.then(function(d){\nhire.disabled=!d.can_hire;\nfire.disabled=!d.can_fire_farm;\nif(rh)rh.disabled=!d.can_hire;\nif(rf)rf.disabled=!d.can_fire_rat_trapper;\nif(fl)fl.textContent=d.farm_workers;\nif(tl)tl.textContent=d.rat_trapper_workers;\n})\n.catch(function(){hire.disabled=true;fire.disabled=true;if(rh)rh.disabled=true;if(rf)rf.disabled=true;});\n}\nfunction siloAction(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById('_silo_frame');\nif(!f){f=document.createElement('iframe');f.id='_silo_frame';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){\nbtn.disabled=false;\n_siloSyncFarmStaff();\n_siloSyncInvestigateBtn();\n},600);\n};\n_siloSyncInvestigateBtn();\n_siloSyncFarmStaff();\nsetInterval(_siloSyncInvestigateBtn,2000);\nsetInterval(_siloSyncFarmStaff,2000);\n</script>\n<div style=\"padding:20px;font-family:Inter,sans-serif;height:100%;box-sizing:border-box\">\n  <div style=\"display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:6px\">\n    <span style=\"color:#888;font-size:13px\">Farm workers:</span>\n    <span id=\"_silo_farm_count_lbl\" style=\"color:#c9d1d9;font-weight:700;min-width:22px;text-align:right\">–</span>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" id=\"_silo_farm_fire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=-1')\">&minus;</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" id=\"_silo_farm_hire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-food?user_id=${user_id}&delta=1')\">+</button>\n  </div>\n  <div style=\"display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px\">\n    <span style=\"color:#888;font-size:13px\">Rat trappers:</span>\n    <span id=\"_silo_trap_count_lbl\" style=\"color:#c9d1d9;font-weight:700;min-width:22px;text-align:right\">–</span>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" id=\"_silo_trap_fire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-rat-trappers?user_id=${user_id}&delta=-1')\">&minus;</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" id=\"_silo_trap_hire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-rat-trappers?user_id=${user_id}&delta=1')\">+</button>\n  </div>\n  <p style=\"margin:0 0 14px;color:#666;font-size:12px\">Each hydro bay has Plant/Harvest controls above. Farm workers improve harvest size only (see bays above). Rat trappers recover spilled grain continuously—proportionally to how hungry the rat swarm would make residents—and fully suppress the silo rat incident once trap output meets or exceeds that raid drain.</p>\n  <div style=\"margin-top:4px;padding-top:14px;border-top:1px solid #333\">\n    <p style=\"margin:0 0 10px;color:#c9a227;font-size:13px;font-weight:600\">Routine compartment sweep</p>\n    <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_investigate_btn\" disabled onclick=\"siloAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=farming')\">Send investigation team</button>\n    <p id=\"_silo_inv_hint\" style=\"margin:10px 0 0;color:#666;font-size:11px\"></p>\n  </div>\n  <p style=\"margin:14px 0 0;color:#666;font-size:12px\">Assigning farm workers does not reduce loyalty. Workers assigned here and on the Power dashboard cannot exceed bunker population.</p>\n</div>"
       }
     },
     {
@@ -101,11 +713,11 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 8,
+        "y": 20,
         "w": 8,
         "h": 3
       },
-      "transparent": true,
+      "transparent": false,
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -165,18 +777,18 @@
     {
       "id": 12,
       "type": "stat",
-      "title": "Workers",
+      "title": "Farm workers",
       "datasource": {
         "type": "postgres",
         "uid": "silo-postgres"
       },
       "gridPos": {
         "x": 16,
-        "y": 11,
-        "w": 8,
+        "y": 23,
+        "w": 4,
         "h": 3
       },
-      "transparent": true,
+      "transparent": false,
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -222,21 +834,20 @@
       ]
     },
     {
-      "id": 13,
+      "id": 22,
       "type": "stat",
-      "title": "Crop",
-      "description": "Idle \u2192 Growing \u2192 Ready.",
+      "title": "Rat trappers",
       "datasource": {
         "type": "postgres",
         "uid": "silo-postgres"
       },
       "gridPos": {
-        "x": 16,
-        "y": 14,
-        "w": 8,
+        "x": 20,
+        "y": 23,
+        "w": 4,
         "h": 3
       },
-      "transparent": true,
+      "transparent": false,
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -248,41 +859,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
-                "value": null
-              },
-              {
-                "color": "blue",
-                "value": 1
-              },
-              {
                 "color": "green",
-                "value": 2
+                "value": null
               }
             ]
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "Idle",
-                  "color": "text",
-                  "index": 0
-                },
-                "1": {
-                  "text": "Growing",
-                  "color": "blue",
-                  "index": 1
-                },
-                "2": {
-                  "text": "Ready",
-                  "color": "green",
-                  "index": 2
-                }
-              }
-            }
-          ]
+          }
         }
       },
       "options": {
@@ -293,10 +874,10 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value",
-        "colorMode": "background",
+        "textMode": "auto",
+        "colorMode": "value",
         "graphMode": "none",
-        "justifyMode": "center"
+        "justifyMode": "auto"
       },
       "targets": [
         {
@@ -307,7 +888,7 @@
           },
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time, CASE WHEN crop_ready_at IS NULL THEN 0 WHEN crop_ready_at > NOW() THEN 1 ELSE 2 END AS status\nFROM bunker_farming_systems\nWHERE '$user_id' <> '' AND user_id = '$user_id'::uuid"
+          "rawSql": "SELECT NOW() AS time, bp.count AS rat_trappers\nFROM bunker_farming_systems f\nJOIN bunker_professions bp ON bp.id = f.rat_trapper_line_id\nWHERE '$user_id' <> '' AND f.user_id = '$user_id'::uuid"
         }
       ]
     },
@@ -322,7 +903,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 34,
         "w": 12,
         "h": 9
       },
@@ -374,14 +955,14 @@
       "id": 21,
       "type": "timeseries",
       "title": "Food production and consumption",
-      "description": "Instantaneous rates (food units per second) stored on each tick: population-driven consumption vs farm-worker production.",
+      "description": "Instantaneous rates (food units per second) per tick: population consumption vs passive lines on this tick (farm workers only boost hydro harvest payouts; rat trapper recovery scales with marginal rat-event drain\u2014see constants/events tuning).",
       "datasource": {
         "type": "postgres",
         "uid": "silo-postgres"
       },
       "gridPos": {
         "x": 12,
-        "y": 17,
+        "y": 34,
         "w": 12,
         "h": 9
       },

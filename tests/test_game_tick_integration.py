@@ -10,10 +10,12 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 
+from app.constants import FARM_PLOT_COUNT
 from app.extensions import db
 from app.jobs import game_tick
 from app.models import (
     BunkerBoredom,
+    BunkerCropPlot,
     BunkerDoubt,
     BunkerFarmingSystem,
     BunkerLightingSystem,
@@ -32,6 +34,7 @@ from app.professions import (
     PROFESSION_IDLE,
     PROFESSION_INVESTIGATION,
     PROFESSION_POWER_CRANK,
+    PROFESSION_RAT_TRAPPING,
 )
 
 
@@ -110,7 +113,13 @@ def test_game_tick_commits_simulation_sample(app_ctx):
         count=0,
         updated_at=tick_origin,
     )
-    db.session.add_all([crank_line, farm_line, idle_line, investigation_line])
+    rat_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_RAT_TRAPPING,
+        count=0,
+        updated_at=tick_origin,
+    )
+    db.session.add_all([crank_line, farm_line, rat_line, idle_line, investigation_line])
     db.session.flush()
     db.session.add(BunkerLightingSystem(user_id=uid, lights_on=True, updated_at=tick_origin))
     db.session.add(
@@ -124,10 +133,14 @@ def test_game_tick_commits_simulation_sample(app_ctx):
         BunkerFarmingSystem(
             user_id=uid,
             profession_line_id=farm_line.id,
-            crop_ready_at=None,
+            rat_trapper_line_id=rat_line.id,
             updated_at=tick_origin,
         )
     )
+    for pi in range(FARM_PLOT_COUNT):
+        db.session.add(
+            BunkerCropPlot(user_id=uid, plot_index=pi, crop_ready_at=None),
+        )
     db.session.add(BunkerBoredom(user_id=uid, boredom=0.0, timestamp=tick_origin))
     db.session.add(BunkerDoubt(user_id=uid, doubt=0.0, timestamp=tick_origin))
     db.session.commit()
@@ -151,7 +164,7 @@ def test_game_tick_commits_simulation_sample(app_ctx):
             BunkerProfessionSnapshot.timestamp == latest_ts,
         )
     ).all()
-    assert len(prof_rows) == 4
+    assert len(prof_rows) == 5
     by_prof = {r.profession: r.count for r in prof_rows}
     pop_after = db.session.scalar(
         select(BunkerPopulation.count)
@@ -160,6 +173,7 @@ def test_game_tick_commits_simulation_sample(app_ctx):
         .limit(1)
     )
     assert sum(by_prof.values()) == pop_after
+    assert by_prof[PROFESSION_RAT_TRAPPING] == 0
     assert by_prof[PROFESSION_FARMING] == 3
     assert by_prof[PROFESSION_POWER_CRANK] == 0
     assert by_prof[PROFESSION_INVESTIGATION] == 0
