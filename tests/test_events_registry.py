@@ -13,10 +13,12 @@ def test_rats_event_registered():
     spec = EVENTS_BY_KIND[RATS_SILO_KIND]
     assert spec.resolve_message_auto
     assert spec.resolve_message_player
+    assert spec.system == "farming"
 
 
 def test_game_event_specs_carry_tuning_on_spec():
-    """Tuning lives on GameEventSpec, not Flask config / constants."""
+    """Random-event spawn/sim tuning lives on GameEventSpec; sweep sizing lives in constants."""
+    from app.constants import INVESTIGATION_DISPATCH_BY_SYSTEM
     from app.events import REGISTERED_EVENTS
 
     for spec in REGISTERED_EVENTS:
@@ -26,3 +28,13 @@ def test_game_event_specs_carry_tuning_on_spec():
         assert isinstance(spec.loyalty_delta_auto, float)
         assert isinstance(spec.loyalty_delta_player, float)
         assert callable(spec.eligible)
+
+    for cfg in INVESTIGATION_DISPATCH_BY_SYSTEM.values():
+        assert cfg.team_size > 0
+        assert cfg.duration_seconds > 0
+
+
+def test_investigation_dispatch_defined_for_each_game_system():
+    from app.constants import GAME_SYSTEM_IDS, INVESTIGATION_DISPATCH_BY_SYSTEM
+
+    assert set(INVESTIGATION_DISPATCH_BY_SYSTEM.keys()) == set(GAME_SYSTEM_IDS)

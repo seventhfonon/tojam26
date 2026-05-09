@@ -29,6 +29,7 @@ def test_jobs_imports_random_event_hooks():
         "active_event_food_multiplier",
         "active_event_row",
         "auto_resolve_if_due",
+        "finalize_investigation_if_due",
         "try_spawn_event",
     )
     for name in required:
@@ -48,4 +49,5 @@ def test_game_tick_ast_references_narrative_and_events():
 
     assert "deliver_pending_narrative_messages" in names
     assert "try_spawn_event" in names
+    assert "finalize_investigation_if_due" in names
     assert "auto_resolve_if_due" in names

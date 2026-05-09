@@ -1,6 +1,60 @@
-"""Game tuning — single source of truth (not environment-driven)."""
+"""Game tuning — single source of truth. Import ``app.constants`` in routes, jobs, etc.
+
+Infrastructure (DB URL, secrets, Grafana base URL) lives in ``app.config.Config``.
+Random gameplay event numbers live on each ``GameEventSpec`` in ``app.events``.
+"""
 
 from __future__ import annotations
+
+from dataclasses import dataclass
+
+# --- Game systems (Grafana subsystem dashboards) ---
+GAME_SYSTEM_ENVIRONMENT = "environment"
+GAME_SYSTEM_POWER = "power"
+GAME_SYSTEM_FARMING = "farming"
+GAME_SYSTEM_SOCIAL = "social"
+
+GAME_SYSTEM_IDS: frozenset[str] = frozenset(
+    {
+        GAME_SYSTEM_ENVIRONMENT,
+        GAME_SYSTEM_POWER,
+        GAME_SYSTEM_FARMING,
+        GAME_SYSTEM_SOCIAL,
+    }
+)
+
+GAME_SYSTEM_LABELS: dict[str, str] = {
+    GAME_SYSTEM_ENVIRONMENT: "Environment sensors",
+    GAME_SYSTEM_POWER: "Power systems",
+    GAME_SYSTEM_FARMING: "Farming & silos",
+    GAME_SYSTEM_SOCIAL: "Social programs",
+}
+
+
+def normalize_game_system_id(raw: str | None) -> str | None:
+    """Return canonical subsystem id, or ``None`` if unknown."""
+    if not raw:
+        return None
+    s = raw.strip().lower()
+    return s if s in GAME_SYSTEM_IDS else None
+
+
+@dataclass(frozen=True)
+class InvestigationDispatchConfig:
+    """Residents and timer for a routine sweep of one bunker subsystem."""
+
+    team_size: int
+    duration_seconds: int
+
+
+# Tunables per subsystem (not tied to random events).
+INVESTIGATION_DISPATCH_BY_SYSTEM: dict[str, InvestigationDispatchConfig] = {
+    GAME_SYSTEM_ENVIRONMENT: InvestigationDispatchConfig(team_size=5, duration_seconds=10),
+    GAME_SYSTEM_POWER: InvestigationDispatchConfig(team_size=5, duration_seconds=10),
+    GAME_SYSTEM_FARMING: InvestigationDispatchConfig(team_size=5, duration_seconds=10),
+    GAME_SYSTEM_SOCIAL: InvestigationDispatchConfig(team_size=5, duration_seconds=10),
+}
+
 
 # --- Radiation ---
 # Half-life of 600s with a 30s tick gives a visible decay curve over the

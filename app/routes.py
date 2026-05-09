@@ -29,28 +29,120 @@ from uuid import UUID, uuid4
 
 from flask import Blueprint, current_app, jsonify, make_response, redirect, request
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from .extensions import db
-from .events import active_event_status_payload, spec_for_kind, try_player_resolve
-from .jobs import noisy_radiation_display
+from . import constants
+from .events import investigation_dispatch_status_payload, try_dispatch_investigation
+from .jobs import noisy_radiation_display, normalize_worker_assignments
 from .models import (
     BunkerBoredom,
     BunkerDoubt,
+    BunkerFarmingSystem,
+    BunkerLightingSystem,
     BunkerLoyalty,
     BunkerPopulation,
+    BunkerPowerCrankSystem,
+    BunkerProfession,
     BunkerSocialState,
-    BunkerSystems,
     EnergyReserve,
     FoodReserve,
     RadiationLevel,
     SystemMessage,
     User,
 )
+from .professions import PROFESSION_FARMING, PROFESSION_IDLE, PROFESSION_INVESTIGATION, PROFESSION_POWER_CRANK
 from .social_flavor import NEGATIVE_COUNCIL_MESSAGES, POSITIVE_COUNCIL_MESSAGES
 
 
 log = logging.getLogger(__name__)
 bp = Blueprint("main", __name__)
+
+
+def _seed_bunker_facilities(user: User) -> None:
+    """Create lighting / crank / farm systems and profession lines for a new player."""
+    now = datetime.now(timezone.utc)
+    uid = user.id
+    pop_cap = constants.INITIAL_POPULATION
+    farm_n = min(constants.INITIAL_FARM_WORKERS, pop_cap)
+    crank_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_POWER_CRANK,
+        count=0,
+        updated_at=now,
+    )
+    farm_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_FARMING,
+        count=farm_n,
+        updated_at=now,
+    )
+    idle_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_IDLE,
+        count=max(0, pop_cap - farm_n),
+        updated_at=now,
+    )
+    investigation_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_INVESTIGATION,
+        count=0,
+        updated_at=now,
+    )
+    db.session.add_all([crank_line, farm_line, idle_line, investigation_line])
+    db.session.flush()
+    db.session.add(
+        BunkerLightingSystem(user_id=uid, lights_on=True, updated_at=now),
+    )
+    db.session.add(
+        BunkerPowerCrankSystem(
+            user_id=uid,
+            profession_line_id=crank_line.id,
+            updated_at=now,
+        ),
+    )
+    db.session.add(
+        BunkerFarmingSystem(
+            user_id=uid,
+            profession_line_id=farm_line.id,
+            crop_ready_at=None,
+            updated_at=now,
+        ),
+    )
+
+
+def _get_power_crank_system(user_id: str) -> BunkerPowerCrankSystem | None:
+    return db.session.scalars(
+        select(BunkerPowerCrankSystem)
+        .where(BunkerPowerCrankSystem.user_id == user_id)
+        .options(selectinload(BunkerPowerCrankSystem.profession_line))
+    ).first()
+
+
+def _get_farming_system(user_id: str) -> BunkerFarmingSystem | None:
+    return db.session.scalars(
+        select(BunkerFarmingSystem)
+        .where(BunkerFarmingSystem.user_id == user_id)
+        .options(selectinload(BunkerFarmingSystem.profession_line))
+    ).first()
+
+
+def _idle_profession_line(user_id: str) -> BunkerProfession | None:
+    return db.session.scalars(
+        select(BunkerProfession).where(
+            BunkerProfession.user_id == user_id,
+            BunkerProfession.profession == PROFESSION_IDLE,
+        )
+    ).first()
+
+
+def _investigation_profession_line(user_id: str) -> BunkerProfession | None:
+    return db.session.scalars(
+        select(BunkerProfession).where(
+            BunkerProfession.user_id == user_id,
+            BunkerProfession.profession == PROFESSION_INVESTIGATION,
+        )
+    ).first()
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +209,7 @@ def _get_or_create_social_state(user_id: str) -> BunkerSocialState:
     if row is None:
         row = BunkerSocialState(
             user_id=user_id,
-            inner_circle_loyalty=current_app.config["INITIAL_INNER_CIRCLE_LOYALTY"],
+            inner_circle_loyalty=constants.INITIAL_INNER_CIRCLE_LOYALTY,
         )
         db.session.add(row)
         db.session.commit()
@@ -139,8 +231,8 @@ def _create_player() -> User:
     """Always mint a fresh UUID and seed all game-state tables."""
     user = User(id=str(uuid4()))
     db.session.add(user)
-    true_rad = current_app.config["INITIAL_RADIATION"]
-    noise_max = current_app.config["RADIATION_DISPLAY_NOISE_MAX"]
+    true_rad = constants.INITIAL_RADIATION
+    noise_max = constants.RADIATION_DISPLAY_NOISE_MAX
     db.session.add(RadiationLevel(
         user_id=user.id,
         level=true_rad,
@@ -148,49 +240,40 @@ def _create_player() -> User:
     ))
     db.session.add(BunkerPopulation(
         user_id=user.id,
-        count=current_app.config["INITIAL_POPULATION"],
+        count=constants.INITIAL_POPULATION,
         departed=0,
     ))
     db.session.add(BunkerLoyalty(
         user_id=user.id,
-        loyalty=current_app.config["INITIAL_LOYALTY"],
+        loyalty=constants.INITIAL_LOYALTY,
     ))
     db.session.add(EnergyReserve(
         user_id=user.id,
-        level=current_app.config["INITIAL_ENERGY"],
+        level=constants.INITIAL_ENERGY,
     ))
     db.session.add(FoodReserve(
         user_id=user.id,
-        level=current_app.config["INITIAL_FOOD"],
+        level=constants.INITIAL_FOOD,
         consumption_per_second=0.0,
         production_per_second=0.0,
     ))
-    db.session.add(BunkerSystems(
-        user_id=user.id,
-        lights_on=True,
-        crank_workers=0,
-        food_workers=min(
-            current_app.config["INITIAL_FARM_WORKERS"],
-            current_app.config["INITIAL_POPULATION"],
-        ),
-        crop_ready_at=None,
-    ))
+    _seed_bunker_facilities(user)
     db.session.add(
         BunkerBoredom(
             user_id=user.id,
-            boredom=current_app.config["INITIAL_BOREDOM"],
+            boredom=constants.INITIAL_BOREDOM,
         )
     )
     db.session.add(
         BunkerDoubt(
             user_id=user.id,
-            doubt=current_app.config["INITIAL_DOUBT"],
+            doubt=constants.INITIAL_DOUBT,
         )
     )
     db.session.add(
         BunkerSocialState(
             user_id=user.id,
-            inner_circle_loyalty=current_app.config["INITIAL_INNER_CIRCLE_LOYALTY"],
+            inner_circle_loyalty=constants.INITIAL_INNER_CIRCLE_LOYALTY,
         )
     )
     db.session.commit()
@@ -255,7 +338,7 @@ def action_crank():
     ).first()
 
     if latest is not None:
-        new_level = latest.level + current_app.config["MANUAL_CRANK_ENERGY"]
+        new_level = latest.level + constants.MANUAL_CRANK_ENERGY
         db.session.add(EnergyReserve(
             user_id=user.id,
             level=new_level,
@@ -274,12 +357,12 @@ def action_toggle_lights():
     if user is None:
         return redirect("/new")
 
-    systems = db.session.get(BunkerSystems, user.id)
-    if systems is not None:
-        systems.lights_on = not systems.lights_on
-        systems.updated_at = datetime.now(timezone.utc)
+    lighting = db.session.get(BunkerLightingSystem, user.id)
+    if lighting is not None:
+        lighting.lights_on = not lighting.lights_on
+        lighting.updated_at = datetime.now(timezone.utc)
         db.session.commit()
-        log.info("toggle lights: user=%s lights=%s", user.id, systems.lights_on)
+        log.info("toggle lights: user=%s lights=%s", user.id, lighting.lights_on)
 
     return _action_response(user.id)
 
@@ -309,20 +392,40 @@ def action_adjust_crank():
     ).first()
     max_workers = latest_pop.count if latest_pop is not None else 0
 
-    systems = db.session.get(BunkerSystems, user.id)
-    if systems is not None:
-        if delta > 0:
-            systems.crank_workers += 1
-        elif delta < 0:
-            systems.crank_workers -= 1
-        systems.crank_workers = max(0, min(systems.crank_workers, max_workers))
-        while systems.crank_workers + systems.food_workers > max_workers and systems.food_workers > 0:
-            systems.food_workers -= 1
-        if systems.crank_workers + systems.food_workers > max_workers:
-            systems.crank_workers = max(0, max_workers - systems.food_workers)
-        systems.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        log.info("adjust crank workers: user=%s delta=%+d crank=%d food=%d", user.id, delta, systems.crank_workers, systems.food_workers)
+    crank_sys = _get_power_crank_system(user.id)
+    farm_sys = _get_farming_system(user.id)
+    idle_line = _idle_profession_line(user.id)
+    inv_line = _investigation_profession_line(user.id)
+    if (
+        crank_sys is None
+        or crank_sys.profession_line is None
+        or farm_sys is None
+        or farm_sys.profession_line is None
+    ):
+        return _action_response(user.id)
+
+    now = datetime.now(timezone.utc)
+    crank_line = crank_sys.profession_line
+    farm_line = farm_sys.profession_line
+
+    if delta > 0:
+        crank_line.count += 1
+    elif delta < 0:
+        crank_line.count -= 1
+    crank_line.count = max(0, min(crank_line.count, max_workers))
+    normalize_worker_assignments(
+        crank_line, farm_line, idle_line, inv_line, max_workers, now
+    )
+    crank_sys.updated_at = now
+    farm_sys.updated_at = now
+    db.session.commit()
+    log.info(
+        "adjust crank workers: user=%s delta=%+d crank=%d food=%d",
+        user.id,
+        delta,
+        crank_line.count,
+        farm_line.count,
+    )
 
     return _action_response(user.id)
 
@@ -347,20 +450,40 @@ def action_adjust_food():
     ).first()
     max_workers = latest_pop.count if latest_pop is not None else 0
 
-    systems = db.session.get(BunkerSystems, user.id)
-    if systems is not None:
-        if delta > 0:
-            systems.food_workers += 1
-        elif delta < 0:
-            systems.food_workers -= 1
-        systems.food_workers = max(0, min(systems.food_workers, max_workers))
-        while systems.crank_workers + systems.food_workers > max_workers and systems.crank_workers > 0:
-            systems.crank_workers -= 1
-        if systems.crank_workers + systems.food_workers > max_workers:
-            systems.food_workers = max(0, max_workers - systems.crank_workers)
-        systems.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-        log.info("adjust food workers: user=%s delta=%+d crank=%d food=%d", user.id, delta, systems.crank_workers, systems.food_workers)
+    crank_sys = _get_power_crank_system(user.id)
+    farm_sys = _get_farming_system(user.id)
+    idle_line = _idle_profession_line(user.id)
+    inv_line = _investigation_profession_line(user.id)
+    if (
+        crank_sys is None
+        or crank_sys.profession_line is None
+        or farm_sys is None
+        or farm_sys.profession_line is None
+    ):
+        return _action_response(user.id)
+
+    now = datetime.now(timezone.utc)
+    crank_line = crank_sys.profession_line
+    farm_line = farm_sys.profession_line
+
+    if delta > 0:
+        farm_line.count += 1
+    elif delta < 0:
+        farm_line.count -= 1
+    farm_line.count = max(0, min(farm_line.count, max_workers))
+    normalize_worker_assignments(
+        crank_line, farm_line, idle_line, inv_line, max_workers, now
+    )
+    crank_sys.updated_at = now
+    farm_sys.updated_at = now
+    db.session.commit()
+    log.info(
+        "adjust food workers: user=%s delta=%+d crank=%d food=%d",
+        user.id,
+        delta,
+        crank_line.count,
+        farm_line.count,
+    )
 
     return _action_response(user.id)
 
@@ -372,13 +495,13 @@ def action_plant_crops():
     if user is None:
         return redirect("/new")
 
-    systems = db.session.get(BunkerSystems, user.id)
-    if systems is not None and systems.crop_ready_at is None:
-        growth = current_app.config["FARM_PLANT_GROWTH_SECONDS"]
-        systems.crop_ready_at = datetime.now(timezone.utc) + timedelta(seconds=growth)
-        systems.updated_at = datetime.now(timezone.utc)
+    farming = _get_farming_system(user.id)
+    if farming is not None and farming.crop_ready_at is None:
+        growth = constants.FARM_PLANT_GROWTH_SECONDS
+        farming.crop_ready_at = datetime.now(timezone.utc) + timedelta(seconds=growth)
+        farming.updated_at = datetime.now(timezone.utc)
         db.session.commit()
-        log.info("plant crops: user=%s ready_at=%s", user.id, systems.crop_ready_at)
+        log.info("plant crops: user=%s ready_at=%s", user.id, farming.crop_ready_at)
 
     return _action_response(user.id)
 
@@ -391,9 +514,12 @@ def action_harvest_crops():
         return redirect("/new")
 
     now = datetime.now(timezone.utc)
-    systems = db.session.get(BunkerSystems, user.id)
-    if systems is None or systems.crop_ready_at is None or now < systems.crop_ready_at:
+    farming = _get_farming_system(user.id)
+    if farming is None or farming.crop_ready_at is None or now < farming.crop_ready_at:
         return _action_response(user.id)
+
+    farm_line = farming.profession_line
+    food_workers = farm_line.count if farm_line is not None else 0
 
     latest_food = db.session.scalars(
         select(FoodReserve)
@@ -411,12 +537,12 @@ def action_harvest_crops():
         .limit(1)
     ).first()
     pop = latest_pop.count if latest_pop is not None else 0
-    consumption_ps = pop * current_app.config["FOOD_PER_CAPITA_PER_SECOND"]
-    production_ps = systems.food_workers * current_app.config["FOOD_PER_WORKER_PER_SECOND"]
-    new_level = latest_food.level + current_app.config["FARM_HARVEST_YIELD"]
+    consumption_ps = pop * constants.FOOD_PER_CAPITA_PER_SECOND
+    production_ps = food_workers * constants.FOOD_PER_WORKER_PER_SECOND
+    new_level = latest_food.level + constants.FARM_HARVEST_YIELD
 
-    systems.crop_ready_at = None
-    systems.updated_at = now
+    farming.crop_ready_at = None
+    farming.updated_at = now
     db.session.add(
         FoodReserve(
             user_id=user.id,
@@ -441,7 +567,7 @@ def action_show_movie():
 
     now = datetime.now(timezone.utc)
     social = _get_or_create_social_state(user.id)
-    cd = current_app.config["SOCIAL_MOVIE_COOLDOWN_SECONDS"]
+    cd = constants.SOCIAL_MOVIE_COOLDOWN_SECONDS
     if _social_cooldown_remaining_seconds(social.last_show_movie_at, cd, now) > 0:
         return _action_response(user.id)
 
@@ -454,8 +580,8 @@ def action_show_movie():
     if latest is None:
         return _action_response(user.id)
 
-    base = current_app.config["SOCIAL_MOVIE_BOREDOM_RELIEF_BASE"]
-    k = current_app.config["SOCIAL_MOVIE_DIMINISH_K"]
+    base = constants.SOCIAL_MOVIE_BOREDOM_RELIEF_BASE
+    k = constants.SOCIAL_MOVIE_DIMINISH_K
     uses = social.movie_action_count
     relief = base / (1.0 + k * uses)
     new_boredom = max(0.0, latest.boredom - relief)
@@ -478,7 +604,7 @@ def action_give_speech():
 
     now = datetime.now(timezone.utc)
     social = _get_or_create_social_state(user.id)
-    cd = current_app.config["SOCIAL_SPEECH_COOLDOWN_SECONDS"]
+    cd = constants.SOCIAL_SPEECH_COOLDOWN_SECONDS
     if _social_cooldown_remaining_seconds(social.last_give_speech_at, cd, now) > 0:
         return _action_response(user.id)
 
@@ -498,9 +624,9 @@ def action_give_speech():
         return _action_response(user.id)
 
     uses = social.speech_action_count
-    lk = current_app.config["SOCIAL_SPEECH_DIMINISH_K"]
-    loyalty_gain = current_app.config["SOCIAL_SPEECH_LOYALTY_GAIN_BASE"] / (1.0 + lk * uses)
-    doubt_relief = current_app.config["SOCIAL_SPEECH_DOUBT_RELIEF_BASE"] / (1.0 + lk * uses)
+    lk = constants.SOCIAL_SPEECH_DIMINISH_K
+    loyalty_gain = constants.SOCIAL_SPEECH_LOYALTY_GAIN_BASE / (1.0 + lk * uses)
+    doubt_relief = constants.SOCIAL_SPEECH_DOUBT_RELIEF_BASE / (1.0 + lk * uses)
 
     new_loyalty = min(100.0, latest_loyalty.loyalty + loyalty_gain)
     new_doubt = max(0.0, latest_doubt.doubt - doubt_relief)
@@ -531,7 +657,7 @@ def action_meet_council():
 
     now = datetime.now(timezone.utc)
     social = _get_or_create_social_state(user.id)
-    cd = current_app.config["SOCIAL_COUNCIL_COOLDOWN_SECONDS"]
+    cd = constants.SOCIAL_COUNCIL_COOLDOWN_SECONDS
     if _social_cooldown_remaining_seconds(social.last_meet_council_at, cd, now) > 0:
         return _action_response(user.id)
 
@@ -559,9 +685,9 @@ def socials_action_status():
     """JSON for Grafana: social action cooldown readiness."""
     user = _identify_player()
     now = datetime.now(timezone.utc)
-    movie_cd = current_app.config["SOCIAL_MOVIE_COOLDOWN_SECONDS"]
-    speech_cd = current_app.config["SOCIAL_SPEECH_COOLDOWN_SECONDS"]
-    council_cd = current_app.config["SOCIAL_COUNCIL_COOLDOWN_SECONDS"]
+    movie_cd = constants.SOCIAL_MOVIE_COOLDOWN_SECONDS
+    speech_cd = constants.SOCIAL_SPEECH_COOLDOWN_SECONDS
+    council_cd = constants.SOCIAL_COUNCIL_COOLDOWN_SECONDS
 
     movie_rem = 0
     speech_rem = 0
@@ -594,43 +720,113 @@ def farming_crop_status():
     harvest_ready = False
     can_plant = False
     if user is not None:
-        systems = db.session.get(BunkerSystems, user.id)
-        if systems is not None:
-            if systems.crop_ready_at is None:
+        farming = _get_farming_system(user.id)
+        if farming is not None:
+            if farming.crop_ready_at is None:
                 can_plant = True
             else:
                 now = datetime.now(timezone.utc)
-                harvest_ready = now >= systems.crop_ready_at
+                harvest_ready = now >= farming.crop_ready_at
     resp = jsonify({"harvest_ready": harvest_ready, "can_plant": can_plant})
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
 
-@bp.route("/events/active-status")
-def events_active_status():
-    """JSON for Grafana: whether a random gameplay event is active."""
+@bp.route("/systems/worker-assignment-status")
+def worker_assignment_status():
+    """JSON for Grafana: shared worker pool (crank + farm vs population)."""
     user = _identify_player()
-    payload = active_event_status_payload(user.id if user else None)
+    if user is None:
+        resp = jsonify(
+            {
+                "population": 0,
+                "crank_workers": 0,
+                "farm_workers": 0,
+                "investigation_workers": 0,
+                "idle_workers": 0,
+                "can_hire": False,
+                "can_fire_crank": False,
+                "can_fire_farm": False,
+            }
+        )
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+
+    latest_pop = db.session.scalars(
+        select(BunkerPopulation)
+        .where(BunkerPopulation.user_id == user.id)
+        .order_by(BunkerPopulation.timestamp.desc())
+        .limit(1)
+    ).first()
+    population = latest_pop.count if latest_pop is not None else 0
+
+    crank_sys = _get_power_crank_system(user.id)
+    farm_sys = _get_farming_system(user.id)
+    crank_line = crank_sys.profession_line if crank_sys is not None else None
+    farm_line = farm_sys.profession_line if farm_sys is not None else None
+    idle_line = _idle_profession_line(user.id)
+
+    crank_workers = crank_line.count if crank_line is not None else 0
+    farm_workers = farm_line.count if farm_line is not None else 0
+    inv_line = _investigation_profession_line(user.id)
+    investigation_workers = inv_line.count if inv_line is not None else 0
+    idle_workers = (
+        idle_line.count
+        if idle_line is not None
+        else max(0, population - crank_workers - farm_workers - investigation_workers)
+    )
+
+    facilities_ready = (
+        crank_sys is not None
+        and farm_sys is not None
+        and crank_line is not None
+        and farm_line is not None
+    )
+    can_hire = (
+        facilities_ready
+        and population > 0
+        and (crank_workers + farm_workers + investigation_workers < population)
+    )
+
+    resp = jsonify(
+        {
+            "population": population,
+            "crank_workers": crank_workers,
+            "farm_workers": farm_workers,
+            "investigation_workers": investigation_workers,
+            "idle_workers": idle_workers,
+            "can_hire": can_hire,
+            "can_fire_crank": crank_workers > 0,
+            "can_fire_farm": farm_workers > 0,
+        }
+    )
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@bp.route("/systems/investigation-dispatch-status")
+def systems_investigation_dispatch_status():
+    """Minimal JSON for Grafana: whether a routine sweep can deploy (no event spoilers)."""
+    user = _identify_player()
+    system_q = (request.args.get("system") or "").strip()
+    payload = investigation_dispatch_status_payload(user.id if user else None, system_q)
     resp = jsonify(payload)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
 
-@bp.route("/action/resolve-event")
-def action_resolve_event():
-    """Resolve the active event via player action (kind must match)."""
+@bp.route("/action/dispatch-investigation")
+def action_dispatch_investigation():
+    """Deploy routine subsystem sweep when enough idle residents are available."""
     user = _identify_player()
     if user is None:
         return redirect("/new")
 
-    kind = (request.args.get("kind") or "").strip()
-    if spec_for_kind(kind) is None:
-        return _action_response(user.id)
-
+    system_q = (request.args.get("system") or "").strip()
     now = datetime.now(timezone.utc)
-    if try_player_resolve(user.id, kind, tick_time=now):
+    if try_dispatch_investigation(user.id, system_q, now):
         db.session.commit()
-        log.info("resolve-event: user=%s kind=%s", user.id, kind)
+        log.info("dispatch-investigation: user=%s system=%s", user.id, system_q)
 
     return _action_response(user.id)
 

@@ -34,6 +34,14 @@ class User(db.Model):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
+    #: Wall-clock instant when sweep detail is recalled from Idle (if still pending).
+    investigation_busy_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: Subsystem id (see ``app.constants.GAME_SYSTEM_IDS``) this deployment targets.
+    investigation_target_system: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )
 
     radiation_samples: Mapped[list["RadiationLevel"]] = relationship(
         back_populates="user",
@@ -55,11 +63,29 @@ class User(db.Model):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    # One row per player; None for legacy users created before this feature.
-    bunker_systems: Mapped[Optional["BunkerSystems"]] = relationship(
+    # One row per player each; None for legacy sessions until migration/backfill.
+    bunker_lighting: Mapped[Optional["BunkerLightingSystem"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+    bunker_power_crank: Mapped[Optional["BunkerPowerCrankSystem"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    bunker_farming: Mapped[Optional["BunkerFarmingSystem"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    profession_lines: Mapped[list["BunkerProfession"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    profession_snapshots: Mapped[list["BunkerProfessionSnapshot"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
     system_messages: Mapped[list["SystemMessage"]] = relationship(
         back_populates="user",
@@ -324,18 +350,52 @@ class FoodReserve(db.Model):
         )
 
 
-class BunkerSystems(db.Model):
-    """Current operational state of the bunker's controllable systems.
+class BunkerProfession(db.Model):
+    """Mutable headcount for one profession slot (one row per user per profession).
 
-    Unlike the time-series tables, this is a single mutable row per player —
-    the game's "control panel." Player actions update it in place; the game
-    tick reads it to compute energy deltas and loyalty effects.
-
-    New systems (HVAC, water reclamation, etc.) should be added as bool
-    columns here with their draw rate defined in config.
+    Worker-assigned bunker systems reference the row for ``Power crank`` or
+    ``Farming`` instead of storing a duplicate count. ``Idle`` has no system row.
+    Tick snapshots copy these counts into :class:`BunkerProfessionSnapshot`.
     """
 
-    __tablename__ = "bunker_systems"
+    __tablename__ = "bunker_professions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "profession", name="uq_bunker_professions_user_profession"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    profession: Mapped[str] = mapped_column(String(64), nullable=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="profession_lines")
+    power_crank_slot: Mapped[Optional["BunkerPowerCrankSystem"]] = relationship(
+        back_populates="profession_line",
+        uselist=False,
+    )
+    farming_slot: Mapped[Optional["BunkerFarmingSystem"]] = relationship(
+        back_populates="profession_line",
+        uselist=False,
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<BunkerProfession user={self.user_id} {self.profession!r} count={self.count}>"
+        )
+
+
+class BunkerLightingSystem(db.Model):
+    """Lighting draw toggle; one mutable row per player."""
+
+    __tablename__ = "bunker_lighting_systems"
 
     user_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
@@ -343,8 +403,60 @@ class BunkerSystems(db.Model):
         primary_key=True,
     )
     lights_on: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    crank_workers: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    food_workers: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="bunker_lighting")
+
+    def __repr__(self) -> str:
+        return f"<BunkerLightingSystem user={self.user_id} lights={'on' if self.lights_on else 'off'}>"
+
+
+class BunkerPowerCrankSystem(db.Model):
+    """Power crank station; worker headcount lives on :attr:`profession_line`."""
+
+    __tablename__ = "bunker_power_crank_systems"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    profession_line_id: Mapped[int] = mapped_column(
+        ForeignKey("bunker_professions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="bunker_power_crank")
+    profession_line: Mapped[BunkerProfession] = relationship(
+        back_populates="power_crank_slot",
+        foreign_keys=[profession_line_id],
+    )
+
+    def __repr__(self) -> str:
+        return f"<BunkerPowerCrankSystem user={self.user_id} line={self.profession_line_id}>"
+
+
+class BunkerFarmingSystem(db.Model):
+    """Hydroponics / farm station; worker headcount on :attr:`profession_line`."""
+
+    __tablename__ = "bunker_farming_systems"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    profession_line_id: Mapped[int] = mapped_column(
+        ForeignKey("bunker_professions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
     crop_ready_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -352,13 +464,43 @@ class BunkerSystems(db.Model):
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
 
-    user: Mapped[User] = relationship(back_populates="bunker_systems")
+    user: Mapped[User] = relationship(back_populates="bunker_farming")
+    profession_line: Mapped[BunkerProfession] = relationship(
+        back_populates="farming_slot",
+        foreign_keys=[profession_line_id],
+    )
 
     def __repr__(self) -> str:
         return (
-            f"<BunkerSystems user={self.user_id} "
-            f"lights={'on' if self.lights_on else 'off'} "
-            f"crank_workers={self.crank_workers} food_workers={self.food_workers}>"
+            f"<BunkerFarmingSystem user={self.user_id} line={self.profession_line_id} "
+            f"crop_ready_at={self.crop_ready_at}>"
+        )
+
+
+class BunkerProfessionSnapshot(db.Model):
+    """Append-only profession counts per tick (Grafana time series)."""
+
+    __tablename__ = "bunker_profession_snapshots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    profession: Mapped[str] = mapped_column(String(64), nullable=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="profession_snapshots")
+
+    def __repr__(self) -> str:
+        return (
+            f"<BunkerProfessionSnapshot user={self.user_id} t={self.timestamp} "
+            f"{self.profession!r}={self.count}>"
         )
 
 
@@ -412,13 +554,15 @@ class PlayerActiveEvent(db.Model):
     auto_resolve_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
+    #: Optional subsystem this event belongs to; sweep dispatch can clear it when ids match.
+    system: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="active_game_event")
 
     def __repr__(self) -> str:
         return (
             f"<PlayerActiveEvent user={self.user_id} kind={self.kind!r} "
-            f"until={self.auto_resolve_at}>"
+            f"system={self.system!r} until={self.auto_resolve_at}>"
         )
 
 

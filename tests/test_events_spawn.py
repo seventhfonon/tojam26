@@ -37,6 +37,7 @@ def test_try_spawn_event_fires_when_eligible_and_roll_succeeds():
     assert row.kind == RATS_SILO_KIND
     assert row.started_at == tick
     assert row.auto_resolve_at == tick + timedelta(seconds=spec.duration_seconds)
+    assert row.system == spec.system
 
     msgs = [o for o in captured if isinstance(o, SystemMessage)]
     if spec.announce_on_start and spec.start_message:

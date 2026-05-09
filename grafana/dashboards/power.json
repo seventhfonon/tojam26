@@ -1,15 +1,28 @@
 {
   "uid": "silo-power",
   "title": "Silo: Power Systems",
-  "tags": ["silo", "game"],
+  "tags": [
+    "silo",
+    "game"
+  ],
   "schemaVersion": 39,
-  "version": 5,
+  "version": 8,
   "editable": true,
   "graphTooltip": 1,
-  "time": {"from": "now-15m", "to": "now"},
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
   "refresh": "2s",
   "timepicker": {
-    "refresh_intervals": ["1s", "2s", "5s", "10s", "30s", "1m"]
+    "refresh_intervals": [
+      "1s",
+      "2s",
+      "5s",
+      "10s",
+      "30s",
+      "1m"
+    ]
   },
   "templating": {
     "list": [
@@ -18,7 +31,10 @@
         "label": "User ID",
         "type": "textbox",
         "query": "",
-        "current": {"text": "", "value": ""},
+        "current": {
+          "text": "",
+          "value": ""
+        },
         "options": [],
         "hide": 2,
         "skipUrlSync": false
@@ -31,18 +47,28 @@
       "type": "text",
       "title": "",
       "datasource": null,
-      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 3},
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
       "options": {
         "mode": "html",
-        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">☢&nbsp; Environment&nbsp;↗</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">⚡&nbsp; Power Systems</span><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">🌾&nbsp; Farming&nbsp;↗</a><a href=\"http://localhost:3000/d/silo-social?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">👥&nbsp; Social&nbsp;↗</a></div>"
+        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u2622&nbsp; Environment&nbsp;\u2197</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\u26a1&nbsp; Power Systems</span><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-social?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc65&nbsp; Social&nbsp;\u2197</a></div>"
       }
     },
     {
       "id": 9,
       "type": "text",
-      "title": "📡 System Messages",
+      "title": "\ud83d\udce1 System Messages",
       "datasource": null,
-      "gridPos": {"x": 0, "y": 3, "w": 24, "h": 5},
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 5
+      },
       "options": {
         "mode": "html",
         "content": "<style>\n.silo-log {\n  font-family: 'Courier New', monospace;\n  font-size: 12px;\n  background: #0d0d0d;\n  padding: 8px 12px;\n  height: 100%;\n  box-sizing: border-box;\n  overflow-y: auto;\n  display: flex;\n  flex-direction: column;\n  justify-content: flex-end;\n  border-radius: 3px;\n}\n.silo-log .msg { margin: 1px 0; }\n.silo-log .ts { color: #3a3a3a; font-size: 10px; margin-right: 6px; }\n.silo-log .prefix { color: #555; margin-right: 4px; }\n.silo-log .body { color: #8fbc8f; }\n.silo-log .empty { color: #333; font-style: italic; }\n</style>\n<div class=\"silo-log\" id=\"_silo_log\"><span class=\"empty\">Awaiting transmissions...</span></div>\n<script>\nfunction _siloLoadMsgs() {\n  fetch('http://localhost:5001/system-messages?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(msgs) {\n      var el = document.getElementById('_silo_log');\n      if (!msgs || !msgs.length) {\n        el.innerHTML = '<span class=\"empty\">Awaiting transmissions...</span>';\n        return;\n      }\n      el.innerHTML = msgs.map(function(m) {\n        var safe = m.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\n        return '<div class=\"msg\"><span class=\"ts\">[' + m.ts + ']</span><span class=\"prefix\">&gt;</span><span class=\"body\">' + safe + '</span></div>';\n      }).join('');\n      el.scrollTop = el.scrollHeight;\n    })\n    .catch(function() {});\n}\n_siloLoadMsgs();\nsetInterval(_siloLoadMsgs, 5000);\n</script>"
@@ -51,39 +77,72 @@
     {
       "id": 2,
       "type": "text",
-      "title": "⚡ Power Management",
-      "description": "Actions fire silently in the background — the dashboard updates within 2 seconds without any page navigation.",
+      "title": "\u26a1 Power Management",
+      "description": "Actions fire silently in the background \u2014 the dashboard updates within 2 seconds without any page navigation.",
       "datasource": null,
-      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 7},
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 7
+      },
       "options": {
         "mode": "html",
-        "content": "<style>\n.silo-btn {\n  display: inline-block;\n  padding: 11px 22px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 14px;\n  letter-spacing: 0.4px;\n  font-family: Inter, sans-serif;\n  box-shadow: 0 2px 6px rgba(0,0,0,0.4);\n  transition: opacity 0.15s;\n  color: #fff;\n}\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--orange { background: #e67e00; }\n.silo-btn--blue   { background: #1f6feb; }\n.silo-btn--gray   { background: #555; font-size: 18px; padding: 9px 18px; }\n.silo-btn--green  { background: #2ea043; font-size: 18px; padding: 9px 18px; }\n</style>\n<script>\nfunction siloAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() { btn.disabled = false; }, 600);\n}\n</script>\n<div style=\"padding: 20px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center;\">\n    <button class=\"silo-btn silo-btn--orange\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/crank?user_id=${user_id}')\">\n      ⚙ CRANK LEVER (+1 energy)\n    </button>\n    <button class=\"silo-btn silo-btn--blue\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/toggle-lights?user_id=${user_id}')\">\n      💡 TOGGLE LIGHTS (0.01 energy/s)\n    </button>\n    <span style=\"color:#888; font-size:13px; margin-left:6px;\">Crank workers:</span>\n    <button class=\"silo-btn silo-btn--gray\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-crank?user_id=${user_id}&delta=-1')\">\n      &minus;\n    </button>\n    <button class=\"silo-btn silo-btn--green\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-crank?user_id=${user_id}&delta=1')\">\n      +\n    </button>\n  </div>\n  <p style=\"margin:14px 0 0; color:#666; font-size:12px;\">⚠ Assigning more than 10 workers to the crank reduces loyalty each tick. Manual cranking is tiring but keeps morale intact. Crank and farm workers share the bunker population cap (see Farming dashboard).</p>\n</div>"
+        "content": "<style>\n.silo-btn {\n  display: inline-block;\n  padding: 11px 22px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 14px;\n  letter-spacing: 0.4px;\n  font-family: Inter, sans-serif;\n  box-shadow: 0 2px 6px rgba(0,0,0,0.4);\n  transition: opacity 0.15s;\n  color: #fff;\n}\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--orange { background: #e67e00; }\n.silo-btn--blue   { background: #1f6feb; }\n.silo-btn--gray   { background: #555; font-size: 18px; padding: 9px 18px; }\n.silo-btn--green  { background: #2ea043; font-size: 18px; padding: 9px 18px; }\n</style>\n<script>\nfunction _siloSyncCrankWorkerButtons() {\n  var hire = document.getElementById('_silo_crank_hire_btn');\n  var fire = document.getElementById('_silo_crank_fire_btn');\n  if (!hire || !fire) return;\n  fetch('http://localhost:5001/systems/worker-assignment-status?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      hire.disabled = !d.can_hire;\n      fire.disabled = !d.can_fire_crank;\n    })\n    .catch(function() {\n      hire.disabled = true;\n      fire.disabled = true;\n    });\n}\nfunction _siloPowerSyncInvestigateBtn() {\n  var btn = document.getElementById('_silo_power_investigate_btn');\n  var hint = document.getElementById('_silo_power_inv_hint');\n  if (!btn) return;\n  fetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}&system=power')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      btn.disabled = !d.can_dispatch;\n      if (hint) hint.textContent = 'Requires ' + d.team_required + ' idle residents (unassigned to crank, farm, or sweep).';\n    })\n    .catch(function() { btn.disabled = true; });\n}\nfunction siloAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloSyncCrankWorkerButtons();\n    _siloPowerSyncInvestigateBtn();\n  }, 600);\n}\n_siloSyncCrankWorkerButtons();\n_siloPowerSyncInvestigateBtn();\nsetInterval(_siloSyncCrankWorkerButtons, 2000);\nsetInterval(_siloPowerSyncInvestigateBtn, 2000);\n</script>\n<div style=\"padding: 20px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <div style=\"display: flex; gap: 14px; flex-wrap: wrap; align-items: center;\">\n    <button class=\"silo-btn silo-btn--orange\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/crank?user_id=${user_id}')\">\n      \u2699 CRANK LEVER (+1 energy)\n    </button>\n    <button class=\"silo-btn silo-btn--blue\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/toggle-lights?user_id=${user_id}')\">\n      \ud83d\udca1 TOGGLE LIGHTS (0.01 energy/s)\n    </button>\n    <span style=\"color:#888; font-size:13px; margin-left:6px;\">Crank workers:</span>\n    <button type=\"button\" class=\"silo-btn silo-btn--gray\" id=\"_silo_crank_fire_btn\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-crank?user_id=${user_id}&delta=-1')\">\n      &minus;\n    </button>\n    <button type=\"button\" class=\"silo-btn silo-btn--green\" id=\"_silo_crank_hire_btn\"\n      onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-crank?user_id=${user_id}&delta=1')\">\n      +\n    </button>\n  </div>\n  <div style=\"margin-top:14px; padding-top:14px; border-top:1px solid #333;\">\n  <p style=\"margin:0 0 10px; color:#c9a227; font-size:13px; font-weight:600;\">Routine compartment sweep</p>\n  <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_power_investigate_btn\" disabled onclick=\"siloAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=power')\">Send investigation team</button>\n  <p id=\"_silo_power_inv_hint\" style=\"margin:10px 0 0; color:#666; font-size:11px;\"></p>\n</div>\n  <p style=\"margin:14px 0 0; color:#666; font-size:12px;\">\u26a0 Assigning more than 10 workers to the crank reduces loyalty each tick. Manual cranking is tiring but keeps morale intact. Crank and farm workers share the bunker population cap (see Farming dashboard).</p>\n</div>"
       }
     },
     {
       "id": 3,
       "type": "stat",
       "title": "Energy reserves",
-      "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 0, "y": 15, "w": 6, "h": 5},
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 6,
+        "h": 5
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "decimals": 2,
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "orange", "value": 20},
-              {"color": "yellow", "value": 50},
-              {"color": "green", "value": 80}
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto",
         "colorMode": "value",
         "graphMode": "area",
@@ -92,7 +151,10 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
           "format": "time_series",
           "rawQuery": true,
           "rawSql": "SELECT timestamp AS time, level FROM energy_reserves WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
@@ -104,26 +166,54 @@
       "type": "stat",
       "title": "Crank workers",
       "description": "Workers currently on the crank. Above 10 reduces loyalty each tick.",
-      "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 6, "y": 15, "w": 6, "h": 5},
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 15,
+        "w": 6,
+        "h": 5
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "decimals": 0,
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 8},
-              {"color": "orange", "value": 10},
-              {"color": "red", "value": 15}
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 8
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto",
         "colorMode": "value",
         "graphMode": "none",
@@ -132,10 +222,13 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time, crank_workers FROM bunker_systems WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid"
+          "rawSql": "SELECT NOW() AS time, bp.count AS crank_workers\nFROM bunker_power_crank_systems p\nJOIN bunker_professions bp ON bp.id = p.profession_line_id\nWHERE '$user_id' <> '' AND p.user_id = '$user_id'::uuid"
         }
       ]
     },
@@ -144,26 +237,50 @@
       "type": "stat",
       "title": "Lights",
       "description": "Current state of the bunker lighting. Use the TOGGLE LIGHTS button above.",
-      "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 12, "y": 15, "w": 6, "h": 5},
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 6,
+        "h": 5
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "decimals": 0,
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "text", "value": null},
-              {"color": "green", "value": 1}
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           },
           "mappings": [
             {
               "type": "value",
               "options": {
-                "0": {"text": "OFF", "color": "text", "index": 0},
-                "1": {"text": "ON",  "color": "green", "index": 1}
+                "0": {
+                  "text": "OFF",
+                  "color": "text",
+                  "index": 0
+                },
+                "1": {
+                  "text": "ON",
+                  "color": "green",
+                  "index": 1
+                }
               }
             }
           ],
@@ -171,7 +288,13 @@
         }
       },
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "value",
         "colorMode": "background",
         "graphMode": "none",
@@ -180,10 +303,13 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time, CASE WHEN lights_on THEN 1 ELSE 0 END AS lights FROM bunker_systems WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid"
+          "rawSql": "SELECT NOW() AS time, CASE WHEN lights_on THEN 1 ELSE 0 END AS lights\nFROM bunker_lighting_systems\nWHERE '$user_id' <> '' AND user_id = '$user_id'::uuid"
         }
       ]
     },
@@ -192,26 +318,54 @@
       "type": "stat",
       "title": "Loyalty",
       "description": "Overworking the crank drains loyalty each tick.",
-      "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 18, "y": 15, "w": 6, "h": 5},
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 15,
+        "w": 6,
+        "h": 5
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "decimals": 1,
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "orange", "value": 30},
-              {"color": "yellow", "value": 50},
-              {"color": "green", "value": 70}
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 30
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 70
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto",
         "colorMode": "value",
         "graphMode": "area",
@@ -220,7 +374,10 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
           "format": "time_series",
           "rawQuery": true,
           "rawSql": "SELECT timestamp AS time, loyalty FROM bunker_loyalty WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
@@ -231,14 +388,24 @@
       "id": 7,
       "type": "timeseries",
       "title": "Energy reserves over time",
-      "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 10},
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 10
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "min": 0,
           "decimals": 2,
-          "color": {"mode": "palette-classic"},
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "smooth",
@@ -252,13 +419,23 @@
         "overrides": []
       },
       "options": {
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
-        "tooltip": {"mode": "single", "sort": "none"}
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
           "format": "time_series",
           "rawQuery": true,
           "rawSql": "SELECT timestamp AS time, level AS \"Energy reserves\" FROM energy_reserves WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
@@ -270,15 +447,25 @@
       "type": "timeseries",
       "title": "Loyalty over time",
       "description": "Crank overwork penalty appears here tick-by-tick.",
-      "datasource": {"type": "postgres", "uid": "silo-postgres"},
-      "gridPos": {"x": 12, "y": 20, "w": 12, "h": 10},
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 10
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "min": 0,
           "max": 100,
           "decimals": 1,
-          "color": {"mode": "palette-classic"},
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "stepAfter",
@@ -292,13 +479,23 @@
         "overrides": []
       },
       "options": {
-        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
-        "tooltip": {"mode": "single", "sort": "none"}
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
           "refId": "A",
-          "datasource": {"type": "postgres", "uid": "silo-postgres"},
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
           "format": "time_series",
           "rawQuery": true,
           "rawSql": "SELECT timestamp AS time, loyalty AS \"Loyalty\" FROM bunker_loyalty WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"

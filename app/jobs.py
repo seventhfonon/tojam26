@@ -10,14 +10,20 @@ from datetime import datetime, timezone
 
 from flask import Flask
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from .extensions import db
+from . import constants
 from .models import (
     BunkerBoredom,
     BunkerDoubt,
+    BunkerFarmingSystem,
+    BunkerLightingSystem,
     BunkerLoyalty,
     BunkerPopulation,
-    BunkerSystems,
+    BunkerPowerCrankSystem,
+    BunkerProfession,
+    BunkerProfessionSnapshot,
     EnergyReserve,
     FoodReserve,
     RadiationLevel,
@@ -25,11 +31,18 @@ from .models import (
     User,
     UserNarrativeDelivery,
 )
+from .professions import (
+    PROFESSION_FARMING,
+    PROFESSION_IDLE,
+    PROFESSION_INVESTIGATION,
+    PROFESSION_POWER_CRANK,
+)
 from .events import (
     EventSpawnContext,
     active_event_food_multiplier,
     active_event_row,
     auto_resolve_if_due,
+    finalize_investigation_if_due,
     try_spawn_event,
 )
 from .narrative import NarrativeContext, deliver_pending_narrative_messages
@@ -53,11 +66,11 @@ def _maybe_log_gamestate_snapshots(
         return
     _last_gamestate_log_mono = now_m
     for s in snapshots:
-        ev = s.get("active_event")
-        ev_s = ev if isinstance(ev, str) else "-"
+        pressure = s.get("hidden_pressure_active")
+        pressure_s = "yes" if pressure else "no"
         log.info(
             "gamestate user=%s pop=%d food=%.1f loyalty=%.1f rad_truth=%.2f "
-            "energy=%s departed_tick=%s event=%s food_mult=%.2f "
+            "energy=%s departed_tick=%s pressure=%s food_mult=%.2f "
             "crank_workers=%d food_workers=%d",
             s["user_id"],
             s["population"],
@@ -66,7 +79,7 @@ def _maybe_log_gamestate_snapshots(
             s["radiation_truth"],
             s["energy"],
             s["departed_tick"],
-            ev_s,
+            pressure_s,
             s["food_mult"],
             s["crank_workers"],
             s["food_workers"],
@@ -84,7 +97,45 @@ class GameTickReadings:
     latest_doubt_sample: BunkerDoubt
     latest_energy_reserve: EnergyReserve | None
     latest_food_reserve: FoodReserve | None
-    bunker_systems: BunkerSystems | None
+    lighting: BunkerLightingSystem | None
+    power_crank: BunkerPowerCrankSystem | None
+    farming: BunkerFarmingSystem | None
+    idle_profession: BunkerProfession | None
+    investigation_profession: BunkerProfession | None
+
+
+def _investigation_worker_count(readings: GameTickReadings) -> int:
+    if readings.investigation_profession is None:
+        return 0
+    return readings.investigation_profession.count
+
+
+def _crank_worker_count(readings: GameTickReadings) -> int:
+    if readings.power_crank is None or readings.power_crank.profession_line is None:
+        return 0
+    return readings.power_crank.profession_line.count
+
+
+def _farm_worker_count(readings: GameTickReadings) -> int:
+    if readings.farming is None or readings.farming.profession_line is None:
+        return 0
+    return readings.farming.profession_line.count
+
+
+def _lights_on(readings: GameTickReadings) -> bool:
+    if readings.lighting is None:
+        return True
+    return readings.lighting.lights_on
+
+
+def _facilities_ready(readings: GameTickReadings) -> bool:
+    return (
+        readings.lighting is not None
+        and readings.power_crank is not None
+        and readings.power_crank.profession_line is not None
+        and readings.farming is not None
+        and readings.farming.profession_line is not None
+    )
 
 
 def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
@@ -137,7 +188,29 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         .limit(1)
     ).first()
 
-    bunker_systems = db.session.get(BunkerSystems, user_id)
+    lighting = db.session.get(BunkerLightingSystem, user_id)
+    power_crank = db.session.scalars(
+        select(BunkerPowerCrankSystem)
+        .where(BunkerPowerCrankSystem.user_id == user_id)
+        .options(selectinload(BunkerPowerCrankSystem.profession_line))
+    ).first()
+    farming = db.session.scalars(
+        select(BunkerFarmingSystem)
+        .where(BunkerFarmingSystem.user_id == user_id)
+        .options(selectinload(BunkerFarmingSystem.profession_line))
+    ).first()
+    idle_profession = db.session.scalars(
+        select(BunkerProfession).where(
+            BunkerProfession.user_id == user_id,
+            BunkerProfession.profession == PROFESSION_IDLE,
+        )
+    ).first()
+    investigation_profession = db.session.scalars(
+        select(BunkerProfession).where(
+            BunkerProfession.user_id == user_id,
+            BunkerProfession.profession == PROFESSION_INVESTIGATION,
+        )
+    ).first()
 
     if (
         latest_radiation_level is None
@@ -156,7 +229,11 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         latest_doubt_sample=latest_doubt_sample,
         latest_energy_reserve=latest_energy_reserve,
         latest_food_reserve=latest_food_reserve,
-        bunker_systems=bunker_systems,
+        lighting=lighting,
+        power_crank=power_crank,
+        farming=farming,
+        idle_profession=idle_profession,
+        investigation_profession=investigation_profession,
     )
 
 
@@ -240,16 +317,13 @@ def handle_boredom_and_doubt_tick(
 
 def handle_loyalty_change(
     latest_loyalty_sample: BunkerLoyalty,
-    bunker_systems: BunkerSystems | None,
+    crank_worker_count: int,
     crank_workers_loyalty_threshold: int,
     loyalty_penalty_per_excess_crank_worker: float,
 ) -> float:
     new_loyalty = latest_loyalty_sample.loyalty
-    if (
-        bunker_systems is not None
-        and bunker_systems.crank_workers > crank_workers_loyalty_threshold
-    ):
-        excess_crank_workers = bunker_systems.crank_workers - crank_workers_loyalty_threshold
+    if crank_worker_count > crank_workers_loyalty_threshold:
+        excess_crank_workers = crank_worker_count - crank_workers_loyalty_threshold
         new_loyalty = max(
             0.0,
             new_loyalty - excess_crank_workers * loyalty_penalty_per_excess_crank_worker,
@@ -308,21 +382,71 @@ def handle_population_departures(
     return departed_count
 
 
-def normalize_worker_assignments(bunker_systems: BunkerSystems, population_cap: int) -> None:
-    """Clamp crank + food workers to ``population_cap`` (shared pool)."""
-    bunker_systems.crank_workers = max(0, min(bunker_systems.crank_workers, population_cap))
-    bunker_systems.food_workers = max(0, min(bunker_systems.food_workers, population_cap))
-    while bunker_systems.crank_workers + bunker_systems.food_workers > population_cap:
-        if bunker_systems.food_workers > 0:
-            bunker_systems.food_workers -= 1
+def normalize_worker_assignments(
+    crank_line: BunkerProfession | None,
+    farm_line: BunkerProfession | None,
+    idle_line: BunkerProfession | None,
+    investigation_line: BunkerProfession | None,
+    population_cap: int,
+    tick_time: datetime,
+) -> None:
+    """Clamp crank + farm to shared pool minus Investigation; refresh Idle."""
+    inv_n = investigation_line.count if investigation_line is not None else 0
+    inv_n = max(0, inv_n)
+    pool = max(0, population_cap - inv_n)
+    if crank_line is None or farm_line is None:
+        return
+    crank_line.count = max(0, min(crank_line.count, pool))
+    farm_line.count = max(0, min(farm_line.count, pool))
+    while crank_line.count + farm_line.count > pool:
+        if farm_line.count > 0:
+            farm_line.count -= 1
         else:
-            bunker_systems.crank_workers -= 1
+            crank_line.count -= 1
+    crank_line.updated_at = tick_time
+    farm_line.updated_at = tick_time
+    if idle_line is not None:
+        idle_line.count = max(
+            0, population_cap - crank_line.count - farm_line.count - inv_n
+        )
+        idle_line.updated_at = tick_time
+
+
+def record_bunker_profession_snapshots(
+    user_id: str,
+    population: int,
+    readings: GameTickReadings,
+    tick_time: datetime,
+) -> None:
+    """Append profession rows (crank, farming, investigation, idle) for Grafana."""
+    crank = _crank_worker_count(readings)
+    farm = _farm_worker_count(readings)
+    inv = _investigation_worker_count(readings)
+    idle_count = (
+        readings.idle_profession.count
+        if readings.idle_profession is not None
+        else max(0, population - crank - farm - inv)
+    )
+    for profession, count in (
+        (PROFESSION_POWER_CRANK, crank),
+        (PROFESSION_FARMING, farm),
+        (PROFESSION_INVESTIGATION, inv),
+        (PROFESSION_IDLE, idle_count),
+    ):
+        db.session.add(
+            BunkerProfessionSnapshot(
+                user_id=user_id,
+                profession=profession,
+                count=count,
+                timestamp=tick_time,
+            )
+        )
 
 
 def handle_food_reserve_change(
     user_id: str,
     current_food_level: float,
-    bunker_systems: BunkerSystems,
+    farm_workers: int,
     population_for_consumption: int,
     elapsed_seconds: float,
     food_per_capita_per_second: float,
@@ -334,7 +458,7 @@ def handle_food_reserve_change(
     consumption_ps = (
         population_for_consumption * food_per_capita_per_second * food_consumption_multiplier
     )
-    production_ps = bunker_systems.food_workers * food_per_worker_per_second
+    production_ps = farm_workers * food_per_worker_per_second
     new_level = max(
         0.0,
         current_food_level + (production_ps - consumption_ps) * elapsed_seconds,
@@ -353,14 +477,15 @@ def handle_food_reserve_change(
 def handle_energy_reserve_change(
     user_id: str,
     latest_energy_reserve: EnergyReserve,
-    bunker_systems: BunkerSystems,
+    lights_on: bool,
+    crank_workers: int,
     elapsed_seconds: float,
     lights_power_draw_per_second: float,
     crank_power_per_worker_per_second: float,
     tick_time: datetime,
 ) -> None:
-    power_draw = lights_power_draw_per_second if bunker_systems.lights_on else 0.0
-    generation_power = bunker_systems.crank_workers * crank_power_per_worker_per_second
+    power_draw = lights_power_draw_per_second if lights_on else 0.0
+    generation_power = crank_workers * crank_power_per_worker_per_second
     new_energy_level = max(
         0.0,
         latest_energy_reserve.level + (generation_power - power_draw) * elapsed_seconds,
@@ -410,22 +535,22 @@ def game_tick(app: Flask) -> None:
     7. Loyalty sample       — records crank-adjusted loyalty plus any auto-resolve
                               loyalty delta from step 0.
 
-    Time series and BunkerSystems reads share one app_context transaction.
+    Time series and split facility reads share one app_context transaction.
     """
     with app.app_context():
-        decay_half_life_seconds = app.config["DECAY_HALF_LIFE_SECONDS"]
-        radiation_display_noise_max = app.config["RADIATION_DISPLAY_NOISE_MAX"]
-        radiation_safe_threshold = app.config["RADIATION_SAFE_THRESHOLD"]
-        base_departure_rate = app.config["BASE_DEPARTURE_RATE"]
-        crank_workers_loyalty_threshold = app.config["CRANK_WORKERS_LOYALTY_THRESHOLD"]
-        loyalty_penalty_per_excess_crank_worker = app.config["CRANK_WORKERS_LOYALTY_PENALTY"]
-        lights_power_draw_per_second = app.config["LIGHTS_POWER_DRAW"]
-        crank_power_per_worker_per_second = app.config["CRANK_POWER_PER_WORKER"]
-        food_per_capita_per_second = app.config["FOOD_PER_CAPITA_PER_SECOND"]
-        food_per_worker_per_second = app.config["FOOD_PER_WORKER_PER_SECOND"]
-        boredom_per_second = app.config["BOREDOM_PER_SECOND"]
-        doubt_growth_max_per_second = app.config["DOUBT_GROWTH_MAX_PER_SECOND"]
-        initial_radiation = app.config["INITIAL_RADIATION"]
+        decay_half_life_seconds = constants.DECAY_HALF_LIFE_SECONDS
+        radiation_display_noise_max = constants.RADIATION_DISPLAY_NOISE_MAX
+        radiation_safe_threshold = constants.RADIATION_SAFE_THRESHOLD
+        base_departure_rate = constants.BASE_DEPARTURE_RATE
+        crank_workers_loyalty_threshold = constants.CRANK_WORKERS_LOYALTY_THRESHOLD
+        loyalty_penalty_per_excess_crank_worker = constants.CRANK_WORKERS_LOYALTY_PENALTY
+        lights_power_draw_per_second = constants.LIGHTS_POWER_DRAW
+        crank_power_per_worker_per_second = constants.CRANK_POWER_PER_WORKER
+        food_per_capita_per_second = constants.FOOD_PER_CAPITA_PER_SECOND
+        food_per_worker_per_second = constants.FOOD_PER_WORKER_PER_SECOND
+        boredom_per_second = constants.BOREDOM_PER_SECOND
+        doubt_growth_max_per_second = constants.DOUBT_GROWTH_MAX_PER_SECOND
+        initial_radiation = constants.INITIAL_RADIATION
         tick_time = datetime.now(timezone.utc)
 
         users = db.session.scalars(select(User)).all()
@@ -434,7 +559,7 @@ def game_tick(app: Flask) -> None:
 
         processed_user_count = 0
         gamestate_snapshots: list[dict[str, object]] = []
-        gs_interval = float(app.config["GAMESTATE_LOG_INTERVAL_SECONDS"])
+        gs_interval = float(constants.GAMESTATE_LOG_INTERVAL_SECONDS)
         for user in users:
             user_id = user.id
 
@@ -450,12 +575,13 @@ def game_tick(app: Flask) -> None:
                 # Clock skew or duplicate run; skip rather than regress any value.
                 continue
 
-            auto_loyalty_adj = auto_resolve_if_due(user_id, tick_time)
+            auto_loyalty_adj = finalize_investigation_if_due(user_id, tick_time)
+            auto_loyalty_adj += auto_resolve_if_due(user_id, tick_time)
 
             if readings.latest_food_reserve is not None:
                 spawn_food = readings.latest_food_reserve.level
             else:
-                spawn_food = app.config["INITIAL_FOOD"]
+                spawn_food = constants.INITIAL_FOOD
             try_spawn_event(
                 user_id,
                 EventSpawnContext(
@@ -494,7 +620,7 @@ def game_tick(app: Flask) -> None:
 
             adjusted_loyalty = handle_loyalty_change(
                 readings.latest_loyalty_sample,
-                readings.bunker_systems,
+                _crank_worker_count(readings),
                 crank_workers_loyalty_threshold,
                 loyalty_penalty_per_excess_crank_worker,
             )
@@ -512,9 +638,33 @@ def game_tick(app: Flask) -> None:
                 tick_time,
             )
 
-            if readings.bunker_systems is not None:
-                post_pop = readings.latest_population_sample.count - departed_this_tick
-                normalize_worker_assignments(readings.bunker_systems, post_pop)
+            post_pop = readings.latest_population_sample.count - departed_this_tick
+            crank_line = (
+                readings.power_crank.profession_line
+                if readings.power_crank is not None
+                else None
+            )
+            farm_line = (
+                readings.farming.profession_line
+                if readings.farming is not None
+                else None
+            )
+            if _facilities_ready(readings):
+                normalize_worker_assignments(
+                    crank_line,
+                    farm_line,
+                    readings.idle_profession,
+                    readings.investigation_profession,
+                    post_pop,
+                    tick_time,
+                )
+                if readings.power_crank is not None:
+                    readings.power_crank.updated_at = tick_time
+                if readings.farming is not None:
+                    readings.farming.updated_at = tick_time
+            record_bunker_profession_snapshots(
+                user_id, post_pop, readings, tick_time
+            )
 
             deliver_pending_narrative_messages(
                 NarrativeContext(
@@ -526,14 +676,12 @@ def game_tick(app: Flask) -> None:
                 )
             )
 
-            if (
-                readings.latest_energy_reserve is not None
-                and readings.bunker_systems is not None
-            ):
+            if readings.latest_energy_reserve is not None and _facilities_ready(readings):
                 handle_energy_reserve_change(
                     user_id,
                     readings.latest_energy_reserve,
-                    readings.bunker_systems,
+                    _lights_on(readings),
+                    _crank_worker_count(readings),
                     elapsed_seconds,
                     lights_power_draw_per_second,
                     crank_power_per_worker_per_second,
@@ -543,13 +691,13 @@ def game_tick(app: Flask) -> None:
             if readings.latest_food_reserve is not None:
                 food_start_level = readings.latest_food_reserve.level
             else:
-                food_start_level = app.config["INITIAL_FOOD"]
+                food_start_level = constants.INITIAL_FOOD
 
-            if readings.bunker_systems is not None:
+            if _facilities_ready(readings):
                 handle_food_reserve_change(
                     user_id,
                     food_start_level,
-                    readings.bunker_systems,
+                    _farm_worker_count(readings),
                     readings.latest_population_sample.count,
                     elapsed_seconds,
                     food_per_capita_per_second,
@@ -576,18 +724,10 @@ def game_tick(app: Flask) -> None:
                         else "na"
                     ),
                     "departed_tick": departed_this_tick,
-                    "active_event": ev_row.kind if ev_row is not None else None,
+                    "hidden_pressure_active": ev_row is not None,
                     "food_mult": food_mult,
-                    "crank_workers": (
-                        readings.bunker_systems.crank_workers
-                        if readings.bunker_systems is not None
-                        else 0
-                    ),
-                    "food_workers": (
-                        readings.bunker_systems.food_workers
-                        if readings.bunker_systems is not None
-                        else 0
-                    ),
+                    "crank_workers": _crank_worker_count(readings),
+                    "food_workers": _farm_worker_count(readings),
                 }
             )
 

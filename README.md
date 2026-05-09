@@ -109,10 +109,10 @@ pytest                         # full suite (needs Postgres on `DATABASE_URL`)
 ## Game tuning
 
 All knobs live in `app/constants.py` (radiation decay, population, energy,
-farming, etc.). Flask still exposes them on `current_app.config` for routes and
-jobs. Random gameplay event numbers (spawn odds, durations, loyalty deltas,
-eligibility thresholds, messages) live on each `GameEventSpec` in `app/events.py`,
-not in `constants.py`.
+farming, social, scheduler tick interval, etc.). Code imports that module
+directly — it is not mirrored on `current_app.config`. Random gameplay event
+numbers (spawn odds, durations, loyalty deltas, eligibility thresholds,
+messages) live on each `GameEventSpec` in `app/events.py`, not in `constants.py`.
 
 With the defaults, a fresh player sees a smooth decay curve dropping from 100
 to ~50 over ten minutes, ~25 over twenty, etc. — slow enough to feel like an
@@ -125,7 +125,7 @@ session.
 .
 ├── app/                      # Flask app package
 │   ├── __init__.py           #   factory + scheduler bootstrap
-│   ├── config.py             #   env-driven config (+ game tuning from constants)
+│   ├── config.py             #   env-driven infrastructure only (DB, Grafana, cookies)
 │   ├── constants.py          #   game tuning (single source of truth)
 │   ├── extensions.py         #   db + scheduler singletons
 │   ├── jobs.py               #   game tick + background jobs

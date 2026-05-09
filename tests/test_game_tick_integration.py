@@ -7,16 +7,31 @@ from uuid import uuid4
 
 import pytest
 
+from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
+
 from app.extensions import db
 from app.jobs import game_tick
 from app.models import (
+    BunkerBoredom,
+    BunkerDoubt,
+    BunkerFarmingSystem,
+    BunkerLightingSystem,
     BunkerLoyalty,
     BunkerPopulation,
-    BunkerSystems,
+    BunkerPowerCrankSystem,
+    BunkerProfession,
+    BunkerProfessionSnapshot,
     EnergyReserve,
     FoodReserve,
     RadiationLevel,
     User,
+)
+from app.professions import (
+    PROFESSION_FARMING,
+    PROFESSION_IDLE,
+    PROFESSION_INVESTIGATION,
+    PROFESSION_POWER_CRANK,
 )
 
 
@@ -25,8 +40,6 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def app_ctx():
-    from sqlalchemy.exc import OperationalError
-
     from app import create_app
 
     try:
@@ -73,14 +86,50 @@ def test_game_tick_commits_simulation_sample(app_ctx):
             timestamp=tick_origin,
         )
     )
+    crank_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_POWER_CRANK,
+        count=0,
+        updated_at=tick_origin,
+    )
+    farm_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_FARMING,
+        count=3,
+        updated_at=tick_origin,
+    )
+    idle_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_IDLE,
+        count=47,
+        updated_at=tick_origin,
+    )
+    investigation_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_INVESTIGATION,
+        count=0,
+        updated_at=tick_origin,
+    )
+    db.session.add_all([crank_line, farm_line, idle_line, investigation_line])
+    db.session.flush()
+    db.session.add(BunkerLightingSystem(user_id=uid, lights_on=True, updated_at=tick_origin))
     db.session.add(
-        BunkerSystems(
+        BunkerPowerCrankSystem(
             user_id=uid,
-            lights_on=True,
-            crank_workers=0,
-            food_workers=3,
+            profession_line_id=crank_line.id,
+            updated_at=tick_origin,
         )
     )
+    db.session.add(
+        BunkerFarmingSystem(
+            user_id=uid,
+            profession_line_id=farm_line.id,
+            crop_ready_at=None,
+            updated_at=tick_origin,
+        )
+    )
+    db.session.add(BunkerBoredom(user_id=uid, boredom=0.0, timestamp=tick_origin))
+    db.session.add(BunkerDoubt(user_id=uid, doubt=0.0, timestamp=tick_origin))
     db.session.commit()
 
     rad_before = db.session.query(RadiationLevel).filter_by(user_id=uid).count()
@@ -89,3 +138,29 @@ def test_game_tick_commits_simulation_sample(app_ctx):
 
     rad_after = db.session.query(RadiationLevel).filter_by(user_id=uid).count()
     assert rad_after > rad_before, "tick should append a new radiation sample"
+
+    latest_ts = db.session.scalar(
+        select(func.max(BunkerProfessionSnapshot.timestamp)).where(
+            BunkerProfessionSnapshot.user_id == uid
+        )
+    )
+    assert latest_ts is not None
+    prof_rows = db.session.scalars(
+        select(BunkerProfessionSnapshot).where(
+            BunkerProfessionSnapshot.user_id == uid,
+            BunkerProfessionSnapshot.timestamp == latest_ts,
+        )
+    ).all()
+    assert len(prof_rows) == 4
+    by_prof = {r.profession: r.count for r in prof_rows}
+    pop_after = db.session.scalar(
+        select(BunkerPopulation.count)
+        .where(BunkerPopulation.user_id == uid)
+        .order_by(BunkerPopulation.timestamp.desc())
+        .limit(1)
+    )
+    assert sum(by_prof.values()) == pop_after
+    assert by_prof[PROFESSION_FARMING] == 3
+    assert by_prof[PROFESSION_POWER_CRANK] == 0
+    assert by_prof[PROFESSION_INVESTIGATION] == 0
+    assert by_prof[PROFESSION_IDLE] == pop_after - 3
