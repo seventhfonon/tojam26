@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SNIPPET = ROOT / "grafana" / "bgm-panel-snippet.html"
 
-BGM_URL = "http://localhost:5001/assets/audio/JazzWithAmbience.ogg"
+BGM_URL = "http://localhost:5001/assets/audio/plutonium_jazz.ogg"
 SFX_BUTTON_CLICK_URL = "http://localhost:5001/assets/audio/sfx_button_click.mp3"
 
 NAV_PANEL_ID = 1
