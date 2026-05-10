@@ -152,6 +152,7 @@ def _seed_bunker_facilities(user: User) -> None:
             user_id=uid,
             profession_line_id=theatre_line.id,
             phase=constants.THEATRE_PHASE_IDLE,
+            play_index=0,
             phase_entered_at=now,
             updated_at=now,
         ),
@@ -187,6 +188,25 @@ def _get_theatre_system(user_id: str) -> BunkerTheatreSystem | None:
         .where(BunkerTheatreSystem.user_id == user_id)
         .options(selectinload(BunkerTheatreSystem.profession_line))
     ).first()
+
+
+def _theatre_play_title(theatre_sys: BunkerTheatreSystem | None) -> str:
+    if theatre_sys is None:
+        return ""
+    titles = constants.THEATRE_PLAY_TITLES
+    if not titles:
+        return ""
+    return titles[int(theatre_sys.play_index) % len(titles)]
+
+
+def _theatre_status_ui(phase: str) -> str:
+    if phase == constants.THEATRE_PHASE_WRITING:
+        return "planning"
+    if phase == constants.THEATRE_PHASE_REHEARSING:
+        return "rehearsing"
+    if phase == constants.THEATRE_PHASE_READY:
+        return "showing"
+    return "idle"
 
 
 def _ensure_crop_plots(user_id: str) -> None:
@@ -339,13 +359,16 @@ def _social_cooldown_remaining_seconds(
 
 
 def _player_actions_locked(user: User, now: datetime) -> bool:
-    """True during wall-clock sermon window."""
-    bu = user.sermon_busy_until
-    return bu is not None and now < bu
+    """True during wall-clock sermon or Fireside Chat windows."""
+    su = user.sermon_busy_until
+    if su is not None and now < su:
+        return True
+    fu = user.fireside_busy_until
+    return fu is not None and now < fu
 
 
 def _reject_if_sermon_locked(user: User | None):
-    """Return iframe redirect response when sermon blocks actions; else None."""
+    """Return iframe redirect response when sermon/fireside blocks actions; else None."""
     if user is None:
         return None
     now = datetime.now(timezone.utc)
@@ -1082,6 +1105,50 @@ def action_meet_council():
     return _action_response(user.id)
 
 
+@bp.route("/action/start-fireside-chat")
+def action_start_fireside_chat():
+    """Begin a timed Fireside Chat (locks other actions until it completes)."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    kind_raw = (request.args.get("kind") or "").strip().lower()
+    if kind_raw not in constants.FIRESIDE_KINDS:
+        log.warning("start fireside: invalid kind=%r user=%s", kind_raw, user.id)
+        return _action_response(user.id)
+
+    now = datetime.now(timezone.utc)
+    if user.sermon_busy_until is not None and now < user.sermon_busy_until:
+        return _action_response(user.id)
+    if user.fireside_busy_until is not None and now < user.fireside_busy_until:
+        return _action_response(user.id)
+
+    social = _get_or_create_social_state(user.id)
+    cd_rem = _social_cooldown_remaining_seconds(
+        social.last_fireside_chat_at,
+        constants.FIRESIDE_CHAT_COOLDOWN_SECONDS,
+        now,
+    )
+    if cd_rem > 0:
+        return _action_response(user.id)
+
+    social.last_fireside_chat_at = now
+    user.fireside_busy_until = now + timedelta(
+        seconds=constants.FIRESIDE_CHAT_DURATION_SECONDS
+    )
+    user.fireside_pending_kind = kind_raw
+    user.fireside_effect_fraction_accrued = 0.0
+    db.session.commit()
+    log.info(
+        "start fireside: user=%s kind=%s busy_until=%s",
+        user.id,
+        kind_raw,
+        user.fireside_busy_until,
+    )
+
+    return _action_response(user.id)
+
+
 @bp.route("/action/start-sermon")
 def action_start_sermon():
     """Block other actions until sermon completes; loyalty reward applied on next tick after."""
@@ -1090,6 +1157,8 @@ def action_start_sermon():
         return redirect("/new")
 
     now = datetime.now(timezone.utc)
+    if user.fireside_busy_until is not None and now < user.fireside_busy_until:
+        return _action_response(user.id)
     if user.sermon_busy_until is not None and now < user.sermon_busy_until:
         return _action_response(user.id)
 
@@ -1175,10 +1244,14 @@ def socials_action_status():
     council_rem = 0
     actions_locked = False
     sermon_rem = 0
+    fireside_rem = 0
+    fireside_cd_rem = 0
     movies_payload: list[dict[str, object]] = []
     theatre_phase = constants.THEATRE_PHASE_IDLE
     theatre_actors = 0
     theatre_next_perf_rem = 0
+    theatre_play_title = ""
+    theatre_status_ui = "idle"
 
     can_show_movie_flag = False
 
@@ -1203,6 +1276,12 @@ def socials_action_status():
                 math.ceil((user.sermon_busy_until - now).total_seconds()),
             )
 
+        if user.fireside_busy_until is not None and now < user.fireside_busy_until:
+            fireside_rem = max(
+                0,
+                math.ceil((user.fireside_busy_until - now).total_seconds()),
+            )
+
         social = db.session.get(BunkerSocialState, user.id)
         if social is not None:
             speech_rem = _social_cooldown_remaining_seconds(
@@ -1211,10 +1290,17 @@ def socials_action_status():
             council_rem = _social_cooldown_remaining_seconds(
                 social.last_meet_council_at, council_cd, now
             )
+            fireside_cd_rem = _social_cooldown_remaining_seconds(
+                social.last_fireside_chat_at,
+                constants.FIRESIDE_CHAT_COOLDOWN_SECONDS,
+                now,
+            )
 
         theatre_sys = _get_theatre_system(user.id)
         if theatre_sys is not None:
             theatre_phase = theatre_sys.phase
+            theatre_play_title = _theatre_play_title(theatre_sys)
+            theatre_status_ui = _theatre_status_ui(theatre_phase)
             if theatre_sys.profession_line is not None:
                 theatre_actors = theatre_sys.profession_line.count
             if theatre_sys.next_performance_at is not None:
@@ -1223,10 +1309,32 @@ def socials_action_status():
                     math.ceil((theatre_sys.next_performance_at - now).total_seconds()),
                 )
 
+    sermon_active = (
+        user is not None
+        and user.sermon_busy_until is not None
+        and now < user.sermon_busy_until
+    )
+    fireside_active = (
+        user is not None
+        and user.fireside_busy_until is not None
+        and now < user.fireside_busy_until
+    )
+    can_start_fireside_chat = (
+        user is not None
+        and not sermon_active
+        and not fireside_active
+        and fireside_cd_rem == 0
+    )
+
     resp = jsonify(
         {
             "actions_locked": actions_locked,
             "sermon_seconds_remaining": sermon_rem,
+            "fireside_seconds_remaining": fireside_rem,
+            "fireside_cooldown_seconds_remaining": fireside_cd_rem,
+            "fireside_chat_duration_seconds": int(constants.FIRESIDE_CHAT_DURATION_SECONDS),
+            "fireside_chat_cooldown_seconds": int(constants.FIRESIDE_CHAT_COOLDOWN_SECONDS),
+            "can_start_fireside_chat": can_start_fireside_chat,
             "can_start_sermon": user is not None and not actions_locked,
             "can_show_movie": can_show_movie_flag,
             "can_give_speech": user is not None and speech_rem == 0 and not actions_locked,
@@ -1238,6 +1346,30 @@ def socials_action_status():
             "theatre_phase": theatre_phase,
             "theatre_actor_count": theatre_actors,
             "theatre_next_performance_seconds_remaining": theatre_next_perf_rem,
+            "theatre_play_title": theatre_play_title,
+            "theatre_status_ui": theatre_status_ui,
+            "theatre_loyalty_per_second": (
+                float(constants.THEATRE_LOYALTY_PER_SECOND)
+                if theatre_phase
+                in (
+                    constants.THEATRE_PHASE_WRITING,
+                    constants.THEATRE_PHASE_REHEARSING,
+                    constants.THEATRE_PHASE_READY,
+                )
+                else 0.0
+            ),
+            "theatre_boredom_relief_per_second": (
+                float(constants.THEATRE_BOREDOM_RELIEF_PER_SECOND)
+                if theatre_phase == constants.THEATRE_PHASE_READY
+                else 0.0
+            ),
+            "theatre_energy_draw_per_second": float(
+                constants.THEATRE_POWER_DRAW_PER_ACTOR
+            )
+            * float(theatre_actors),
+            "theatre_boredom_relief_per_play": float(
+                constants.THEATRE_BOREDOM_RELIEF_PER_PLAY
+            ),
         }
     )
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -1445,7 +1577,7 @@ def worker_assignment_status():
             "idle_workers": idle_workers,
             "can_hire": can_hire,
             "can_hire_rat_trapper": can_hire_rat_trapper,
-            "can_hire_theatre": can_hire,
+            "can_hire_theatre": can_hire and idle_workers > 0,
             "can_fire_crank": crank_workers > 0,
             "can_fire_farm": farm_workers > 0,
             "can_fire_rat_trapper": rat_trapper_workers > 0,
@@ -1491,8 +1623,9 @@ def action_dispatch_investigation():
 def system_messages():
     """Return the 5 most recent system messages for the current player.
 
-    Returns JSON: list of {ts, body} objects ordered oldest-first (so the
+    Returns JSON: list of ``{ts, body, urgency, emoji}`` ordered oldest-first (so the
     frontend can render them top-to-bottom with the newest at the bottom).
+    ``body`` has ``!`` / ``!!`` urgency prefixes stripped; ``emoji`` matches ``urgency``.
     The CORS header allows the Grafana origin to fetch this directly.
     """
     user = _identify_player()
@@ -1504,10 +1637,17 @@ def system_messages():
             .order_by(SystemMessage.timestamp.desc())
             .limit(5)
         ).all()
-        msgs = [
-            {"ts": m.timestamp.strftime("%H:%M"), "body": m.body}
-            for m in reversed(rows)
-        ]
+        msgs = []
+        for m in reversed(rows):
+            urgency, display_body = constants.parse_system_message_body(m.body)
+            msgs.append(
+                {
+                    "ts": m.timestamp.strftime("%H:%M"),
+                    "body": display_body,
+                    "urgency": urgency,
+                    "emoji": constants.system_message_urgency_emoji(urgency),
+                }
+            )
     resp = jsonify(msgs)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp

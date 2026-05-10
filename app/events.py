@@ -7,6 +7,7 @@ rows per player (unique per ``kind``). Tunables live on :class:`GameEventSpec`.
 from __future__ import annotations
 
 import logging
+import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ from typing import Any
 
 from sqlalchemy import select
 
+from flask import has_app_context
+
 from .extensions import db
 from . import constants as game_constants
 from .constants import (
@@ -23,7 +26,14 @@ from .constants import (
     INVESTIGATION_DISPATCH_BY_SYSTEM,
     normalize_game_system_id,
 )
-from .models import BunkerProfession, PlayerActiveEvent, SystemMessage, User
+from .models import (
+    BunkerDoubt,
+    BunkerProfession,
+    BunkerSocialState,
+    PlayerActiveEvent,
+    SystemMessage,
+    User,
+)
 from .professions import PROFESSION_IDLE, PROFESSION_INVESTIGATION
 
 log = logging.getLogger(__name__)
@@ -34,6 +44,8 @@ class EventDefinition(StrEnum):
 
     RATS_SILO_INTRO = "rats_silo_intro"
     RATS_SILO = "rats_silo"
+    FIRESIDE_RHETORIC_BACKLASH = "fireside_rhetoric_backlash"
+    GEIGER_RUMOR_EXODUS = "geiger_rumor_exodus"
 
 ROUTINE_INVESTIGATION_DISPATCH_TEMPLATE = (
     "{n} residents detached for scheduled sweep of {subsystem}. "
@@ -190,8 +202,8 @@ def _rats_silo_intro_after_player_resolve(user_id: str, _tick_time: datetime) ->
 
 def _rats_silo_intro_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
     return (
-        "RATS! Grain-room telemetry flagged vibration behind the inner jacket — "
-        "rats have breached the silo liner."
+        "!RATS! Grain-room telemetry flagged vibration behind the inner jacket — "
+        "rats have breached the silo liner. We may be able to salvage something by investigating food storage."
     )
 
 
@@ -239,6 +251,80 @@ def _rats_silo_spike_tick_effects(_user_id: str, _tick_time: datetime) -> EventT
     return EventTickEffects(food_consumption_multiplier=3.0)
 
 
+def _fireside_backlash_can_spawn(_ctx: EventSpawnContext) -> bool:
+    return False
+
+
+def _fireside_backlash_tick_effects(_user_id: str, _tick_time: datetime) -> EventTickEffects:
+    return EventTickEffects()
+
+
+def _fireside_backlash_auto_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
+    return EventOutcome(
+        loyalty_delta=0.0,
+        message=(
+            "Whispers about your last broadcast fade into the usual bunker noise."
+        ),
+    )
+
+
+def _fireside_backlash_player_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
+    return EventOutcome(loyalty_delta=0.0, message="")
+
+
+def _fireside_backlash_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
+    return None
+
+
+def _fireside_backlash_on_spawn(user_id: str, tick_time: datetime) -> None:
+    latest = db.session.scalars(
+        select(BunkerDoubt)
+        .where(BunkerDoubt.user_id == user_id)
+        .order_by(BunkerDoubt.timestamp.desc())
+        .limit(1)
+    ).first()
+    cur = float(latest.doubt) if latest is not None else 0.0
+    new_d = min(
+        100.0,
+        cur + float(game_constants.FIRESIDE_BACKLASH_DOUBT_DELTA),
+    )
+    db.session.add(BunkerDoubt(user_id=user_id, doubt=new_d, timestamp=tick_time))
+
+
+def _geiger_exodus_can_spawn(_ctx: EventSpawnContext) -> bool:
+    return False
+
+
+def _geiger_exodus_tick_effects(_user_id: str, _tick_time: datetime) -> EventTickEffects:
+    return EventTickEffects()
+
+
+def _geiger_exodus_auto_resolve(user_id: str, _tick_time: datetime) -> EventOutcome:
+    if has_app_context():
+        user_row = db.session.get(User, user_id)
+        if user_row is not None:
+            user_row.rumor_exodus_quota_initial = 0
+            user_row.rumor_exodus_quota_remaining = 0
+    return EventOutcome(
+        loyalty_delta=0.0,
+        message=(
+            "The scramble toward the hatch loses steam — whoever could bolt already did."
+        ),
+    )
+
+
+def _geiger_exodus_player_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
+    return EventOutcome(loyalty_delta=0.0, message="")
+
+
+def _geiger_exodus_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
+    return None
+
+
+def _noop_geiger_on_spawn(_user_id: str, _tick_time: datetime) -> None:
+    return None
+
+
 REGISTERED_EVENTS: tuple[GameEventSpec, ...] = (
     GameEventSpec(
         definition=EventDefinition.RATS_SILO_INTRO,
@@ -265,11 +351,163 @@ REGISTERED_EVENTS: tuple[GameEventSpec, ...] = (
         on_spawn=_noop_on_spawn,
         system="farming",
     ),
+    GameEventSpec(
+        definition=EventDefinition.FIRESIDE_RHETORIC_BACKLASH,
+        spawn_chance_per_tick=0.0,
+        duration_seconds=int(game_constants.FIRESIDE_RHETORIC_BACKLASH_DURATION_SECONDS),
+        tick_effects=_fireside_backlash_tick_effects,
+        can_spawn=_fireside_backlash_can_spawn,
+        auto_resolve=_fireside_backlash_auto_resolve,
+        player_resolve=_fireside_backlash_player_resolve,
+        spawn_announcement=_fireside_backlash_spawn_announce,
+        on_spawn=_fireside_backlash_on_spawn,
+        system=None,
+    ),
+    GameEventSpec(
+        definition=EventDefinition.GEIGER_RUMOR_EXODUS,
+        spawn_chance_per_tick=0.0,
+        duration_seconds=int(game_constants.GEIGER_RUMOR_CRISIS_DURATION_SECONDS),
+        tick_effects=_geiger_exodus_tick_effects,
+        can_spawn=_geiger_exodus_can_spawn,
+        auto_resolve=_geiger_exodus_auto_resolve,
+        player_resolve=_geiger_exodus_player_resolve,
+        spawn_announcement=_geiger_exodus_spawn_announce,
+        on_spawn=_noop_geiger_on_spawn,
+        system=None,
+    ),
 )
 
 EVENTS_BY_DEFINITION: dict[str, GameEventSpec] = {
     s.definition.value: s for s in REGISTERED_EVENTS
 }
+
+
+def enqueue_fireside_rhetoric_backlash(user_id: str, when: datetime) -> None:
+    """Manual-only event from fearmongering Fireside Chat backfire (never RNG-spawned)."""
+    if player_has_active_event_kind(user_id, EventDefinition.FIRESIDE_RHETORIC_BACKLASH):
+        return
+    spec = spec_for_definition(EventDefinition.FIRESIDE_RHETORIC_BACKLASH)
+    if spec is None or spec.duration_seconds is None:
+        return
+    dur_s = int(spec.duration_seconds)
+    deadline = when + timedelta(seconds=dur_s)
+    db.session.add(
+        PlayerActiveEvent(
+            user_id=user_id,
+            kind=spec.definition,
+            started_at=when,
+            auto_resolve_at=deadline,
+            system=None,
+        )
+    )
+    spec.on_spawn(user_id, when)
+    db.session.add(
+        SystemMessage(
+            user_id=user_id,
+            body=(
+                "!!Word spreads fast: residents circulate rough transcripts and "
+                "spot holes in your speech."
+            ),
+            timestamp=when,
+        )
+    )
+    log.info("fireside rhetoric backlash enqueued: user=%s until=%s", user_id, deadline)
+
+
+def enqueue_geiger_rumor_exodus(user_id: str, when: datetime, population_count: int) -> None:
+    """Manual-only one-shot crisis when radiation truth first falls below bunker doubt."""
+    if player_has_active_event_kind(user_id, EventDefinition.GEIGER_RUMOR_EXODUS):
+        return
+    user_row = db.session.get(User, user_id)
+    if user_row is None:
+        return
+    if user_row.geiger_rumor_crisis_triggered:
+        return
+    pop = max(0, int(population_count))
+    user_row.geiger_rumor_crisis_triggered = True
+    if pop <= 0:
+        return
+
+    frac = float(game_constants.GEIGER_RUMOR_EMIGRATION_FRACTION)
+    quota = max(1, round(pop * frac))
+    user_row.rumor_exodus_quota_initial = quota
+    user_row.rumor_exodus_quota_remaining = quota
+
+    social = db.session.get(BunkerSocialState, user_id)
+    if social is not None:
+        social.last_fireside_chat_at = None
+
+    dur_s = int(game_constants.GEIGER_RUMOR_CRISIS_DURATION_SECONDS)
+    deadline = when + timedelta(seconds=dur_s)
+    db.session.add(
+        PlayerActiveEvent(
+            user_id=user_id,
+            kind=EventDefinition.GEIGER_RUMOR_EXODUS,
+            started_at=when,
+            auto_resolve_at=deadline,
+            system=None,
+        )
+    )
+    db.session.add(
+        SystemMessage(
+            user_id=user_id,
+            body=(
+                "!!Rumors spread that Geiger readings outside are lower than what you've reported. "
+                "People quietly kit up to chance it on their own; others linger, waiting on word from you."
+            ),
+            timestamp=when,
+        )
+    )
+    log.info("geiger rumor exodus enqueued: user=%s quota=%s", user_id, quota)
+
+
+def geiger_rumor_forced_departures_this_tick(user_id: str, tick_time: datetime) -> int:
+    """Scheduled rumor exits spread linearly across ``GEIGER_RUMOR_CRISIS_DURATION_SECONDS``."""
+    if not player_has_active_event_kind(user_id, EventDefinition.GEIGER_RUMOR_EXODUS):
+        return 0
+    user_row = db.session.get(User, user_id)
+    if user_row is None or user_row.rumor_exodus_quota_remaining <= 0:
+        return 0
+    ev_row = db.session.scalars(
+        select(PlayerActiveEvent)
+        .where(
+            PlayerActiveEvent.user_id == user_id,
+            PlayerActiveEvent.kind == EventDefinition.GEIGER_RUMOR_EXODUS.value,
+        )
+        .limit(1)
+    ).first()
+    if ev_row is None:
+        return 0
+
+    q0 = int(user_row.rumor_exodus_quota_initial)
+    rem = int(user_row.rumor_exodus_quota_remaining)
+    if q0 <= 0 or rem <= 0:
+        return 0
+
+    dur = float(game_constants.GEIGER_RUMOR_CRISIS_DURATION_SECONDS)
+    elapsed = max(0.0, min(dur, (tick_time - ev_row.started_at).total_seconds()))
+    share = elapsed / dur if dur > 0 else 1.0
+    target_total = min(q0, int(math.ceil(q0 * share - 1e-9)))
+    already = q0 - rem
+    chunk = max(0, target_total - already)
+    chunk = min(chunk, rem)
+    user_row.rumor_exodus_quota_remaining = rem - chunk
+    return chunk
+
+
+def halt_geiger_rumor_exodus(user_id: str) -> None:
+    """Ends rumor-driven exits when a Fireside Chat completes."""
+    user_row = db.session.get(User, user_id)
+    if user_row is None:
+        return
+    touched = False
+    for row in active_events_for_user(user_id):
+        if row.kind == EventDefinition.GEIGER_RUMOR_EXODUS.value:
+            db.session.delete(row)
+            touched = True
+    if touched or user_row.rumor_exodus_quota_remaining > 0:
+        user_row.rumor_exodus_quota_initial = 0
+        user_row.rumor_exodus_quota_remaining = 0
 
 
 def spec_for_definition(definition: str | EventDefinition) -> GameEventSpec | None:
@@ -581,6 +819,8 @@ def try_dispatch_investigation(user_id: str, system: str, when: datetime) -> boo
         return False
     if user.sermon_busy_until is not None and when < user.sermon_busy_until:
         return False
+    if user.fireside_busy_until is not None and when < user.fireside_busy_until:
+        return False
     if user.investigation_busy_until is not None and when < user.investigation_busy_until:
         return False
 
@@ -666,11 +906,17 @@ def investigation_dispatch_status_payload(
         and user.sermon_busy_until is not None
         and now < user.sermon_busy_until
     )
+    fireside_locked = (
+        user is not None
+        and user.fireside_busy_until is not None
+        and now < user.fireside_busy_until
+    )
     need = int(cfg.team_size)
     can_dispatch = (
         user is not None
         and not deployed
         and not sermon_locked
+        and not fireside_locked
         and idle_n >= need
     )
     return {

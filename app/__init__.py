@@ -581,6 +581,99 @@ def _ensure_user_rat_trappers_unlocked_column() -> None:
             conn.execute(text("UPDATE users SET rat_trappers_unlocked = TRUE"))
 
 
+def _ensure_user_fireside_columns() -> None:
+    """Fireside Chat busy window + pending tone for ``game_tick`` completion."""
+    insp = inspect(db.engine)
+    if "users" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    with db.engine.begin() as conn:
+        if "fireside_busy_until" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN fireside_busy_until "
+                    "TIMESTAMP WITH TIME ZONE"
+                )
+            )
+        if "fireside_pending_kind" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN fireside_pending_kind VARCHAR(32)"
+                )
+            )
+        if "fireside_effect_fraction_accrued" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN fireside_effect_fraction_accrued "
+                    "DOUBLE PRECISION NOT NULL DEFAULT 0"
+                )
+            )
+
+
+def _ensure_bunker_social_last_fireside_chat_at_column() -> None:
+    """Cooldown anchor between Fireside Chat starts."""
+    insp = inspect(db.engine)
+    if "bunker_social_state" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("bunker_social_state")}
+    if "last_fireside_chat_at" in cols:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_social_state ADD COLUMN last_fireside_chat_at "
+                "TIMESTAMP WITH TIME ZONE"
+            )
+        )
+
+
+def _ensure_user_geiger_rumor_exodus_columns() -> None:
+    """One-shot radiation-vs-doubt crisis + rumor exit quotas while ``geiger_rumor_exodus`` runs."""
+    insp = inspect(db.engine)
+    if "users" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    with db.engine.begin() as conn:
+        if "geiger_rumor_crisis_triggered" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN geiger_rumor_crisis_triggered "
+                    "BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
+        if "rumor_exodus_quota_initial" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN rumor_exodus_quota_initial "
+                    "INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+        if "rumor_exodus_quota_remaining" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN rumor_exodus_quota_remaining "
+                    "INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+
+
+def _ensure_bunker_theatre_play_index_column() -> None:
+    """Catalog rotation index on ``bunker_theatre_systems`` (King Lear / Tempest / Mr. Burns)."""
+    insp = inspect(db.engine)
+    if "bunker_theatre_systems" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("bunker_theatre_systems")}
+    if "play_index" in cols:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_theatre_systems ADD COLUMN play_index "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+
+
 def _ensure_player_active_events_auto_resolve_nullable() -> None:
     """Allow indefinite events (no timer auto-resolve)."""
     insp = inspect(db.engine)
@@ -691,6 +784,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_farming_rat_trapper_lines()
         _ensure_user_rat_infestation_columns()
         _ensure_user_rat_trappers_unlocked_column()
+        _ensure_user_fireside_columns()
+        _ensure_user_geiger_rumor_exodus_columns()
+        _ensure_bunker_social_last_fireside_chat_at_column()
+        _ensure_bunker_theatre_play_index_column()
         _ensure_player_active_events_auto_resolve_nullable()
 
     _maybe_start_scheduler(app)

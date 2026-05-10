@@ -57,7 +57,7 @@ NARRATIVE_MESSAGES: tuple[NarrativeMessage, ...] = (
     NarrativeMessage(
         id="first_departure_notice",
         text=(
-            "A community member has decided to brave the outdoors and leave the bunker. "
+            "!A community member has decided to brave the outdoors and leave the bunker. "
             "More may follow."
         ),
         trigger=_trigger_first_departure_notice,
@@ -91,7 +91,11 @@ def deliver_pending_narrative_messages(ctx: NarrativeContext) -> None:
             continue
 
         db.session.add(
-            SystemMessage(user_id=ctx.user_id, body=message.text, timestamp=ctx.tick_time)
+            SystemMessage(
+                user_id=ctx.user_id,
+                body=message.text,
+                timestamp=ctx.tick_time,
+            )
         )
         db.session.add(
             UserNarrativeDelivery(

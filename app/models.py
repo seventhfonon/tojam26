@@ -56,6 +56,23 @@ class User(db.Model):
     )
     #: When true, next tick after sermon ends applies completion bonuses once.
     sermon_reward_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Wall-clock window while a Fireside Chat is active; blocks other actions (like sermon).
+    fireside_busy_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: Kind queued by HTTP action; applied during the broadcast window in ``game_tick``.
+    fireside_pending_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    #: Portion of the current Fireside broadcast window already credited [0, 1]; reset when chat ends.
+    fireside_effect_fraction_accrued: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.0
+    )
+    #: After ``geiger_rumor_exodus`` fires once, radiation-vs-doubt crossing never retriggers it.
+    geiger_rumor_crisis_triggered: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    #: Rumor panic exits planned while ``geiger_rumor_exodus`` is active (snapshot at enqueue).
+    rumor_exodus_quota_initial: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rumor_exodus_quota_remaining: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     radiation_samples: Mapped[list["RadiationLevel"]] = relationship(
         back_populates="user",
@@ -322,6 +339,10 @@ class BunkerSocialState(db.Model):
     last_meet_council_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    #: Anchor for :data:`~app.constants.FIRESIDE_CHAT_COOLDOWN_SECONDS` between chat starts.
+    last_fireside_chat_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user: Mapped[User] = relationship(back_populates="bunker_social_state")
 
@@ -584,6 +605,8 @@ class BunkerTheatreSystem(db.Model):
     )
     #: idle | writing | rehearsing | ready
     phase: Mapped[str] = mapped_column(String(32), nullable=False, default="idle")
+    #: Rotating script for this bunker cycle; advances after each performance.
+    play_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     phase_entered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )

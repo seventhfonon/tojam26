@@ -28,7 +28,7 @@ GAME_SYSTEM_LABELS: dict[str, str] = {
     GAME_SYSTEM_ENVIRONMENT: "Environment sensors",
     GAME_SYSTEM_POWER: "Power systems",
     GAME_SYSTEM_FARMING: "Farming & silos",
-    GAME_SYSTEM_SOCIAL: "Social programs",
+    GAME_SYSTEM_SOCIAL: "Community programs",
 }
 
 
@@ -38,6 +38,41 @@ def normalize_game_system_id(raw: str | None) -> str | None:
         return None
     s = raw.strip().lower()
     return s if s in GAME_SYSTEM_IDS else None
+
+
+# --- System messages (Grafana terminal log) ---
+# Stored ``body`` may begin with ``!!`` (warning) or ``!`` (alert); API strips these for display.
+SYSTEM_MESSAGE_URGENCY_INFO = "info"
+SYSTEM_MESSAGE_URGENCY_ALERT = "alert"
+SYSTEM_MESSAGE_URGENCY_WARNING = "warning"
+
+SYSTEM_MESSAGE_VALID_URGENCIES: frozenset[str] = frozenset(
+    {
+        SYSTEM_MESSAGE_URGENCY_INFO,
+        SYSTEM_MESSAGE_URGENCY_ALERT,
+        SYSTEM_MESSAGE_URGENCY_WARNING,
+    }
+)
+
+SYSTEM_MESSAGE_URGENCY_EMOJI: dict[str, str] = {
+    SYSTEM_MESSAGE_URGENCY_INFO: "\u2139\ufe0f",
+    SYSTEM_MESSAGE_URGENCY_ALERT: "\U0001f514",
+    SYSTEM_MESSAGE_URGENCY_WARNING: "\u203c\ufe0f",
+}
+
+
+def parse_system_message_body(raw: str) -> tuple[str, str]:
+    """Return ``(urgency, display_body)`` using leading ``!!`` / ``!`` markers."""
+    if raw.startswith("!!"):
+        return SYSTEM_MESSAGE_URGENCY_WARNING, raw[2:].lstrip()
+    if raw.startswith("!"):
+        return SYSTEM_MESSAGE_URGENCY_ALERT, raw[1:].lstrip()
+    return SYSTEM_MESSAGE_URGENCY_INFO, raw
+
+
+def system_message_urgency_emoji(urgency: str) -> str:
+    u = urgency if urgency in SYSTEM_MESSAGE_VALID_URGENCIES else SYSTEM_MESSAGE_URGENCY_INFO
+    return SYSTEM_MESSAGE_URGENCY_EMOJI[u]
 
 
 @dataclass(frozen=True)
@@ -77,6 +112,10 @@ INITIAL_LOYALTY = 100.0
 # the 10-minute mark of a session — giving the player some breathing room
 # before the population clock starts ticking.
 RADIATION_SAFE_THRESHOLD = 50.0
+
+# One-shot rumor crisis when outdoor truth first drops **below** bunker doubt (see ``game_tick``).
+GEIGER_RUMOR_CRISIS_DURATION_SECONDS = 60
+GEIGER_RUMOR_EMIGRATION_FRACTION = 0.2
 
 # Each tick, each unit of "effective disloyalty" contributes this fraction
 # of the population as departures:
@@ -198,6 +237,32 @@ SOCIAL_SPEECH_LOYALTY_GAIN_BASE = 10.0
 SOCIAL_SPEECH_DOUBT_RELIEF_BASE = 12.0
 SOCIAL_SPEECH_DIMINISH_K = 0.5
 
+# --- Fireside chats (Community dashboard; tuning intentionally undocumented in UI) ---
+FIRESIDE_CHAT_COOLDOWN_SECONDS = 120
+FIRESIDE_CHAT_DURATION_SECONDS = 30
+
+FIRESIDE_KIND_REASSURING = "reassuring"
+FIRESIDE_KIND_FEARMONGERING = "fearmongering"
+FIRESIDE_KIND_FRANK = "frank"
+FIRESIDE_KINDS: frozenset[str] = frozenset(
+    {
+        FIRESIDE_KIND_REASSURING,
+        FIRESIDE_KIND_FEARMONGERING,
+        FIRESIDE_KIND_FRANK,
+    }
+)
+
+FIRESIDE_REASSURING_LOYALTY_DELTA = 4.5
+FIRESIDE_FRANK_LOYALTY_DELTA = 7.5
+FIRESIDE_FRANK_DOUBT_DELTA = 6.0
+
+FIRESIDE_FEARMONGER_LOYALTY_DELTA = 13.0
+FIRESIDE_FEARMONGER_DOUBT_DELTA_SOFT = 2.75
+
+FIRESIDE_FEARMONGER_BACKFIRE_CHANCE = 0.38
+FIRESIDE_BACKLASH_DOUBT_DELTA = 24.0
+FIRESIDE_RHETORIC_BACKLASH_DURATION_SECONDS = 78
+
 # --- Movies (catalog below) ---
 # Runtime of one screening; boredom relief and exhaustion apply when this elapses (see ``game_tick``).
 MOVIE_SCREENING_DURATION_SECONDS = 60
@@ -214,10 +279,17 @@ SERMON_COMPLETION_LOYALTY_GAIN = 15.0
 SERMON_COMPLETION_BOREDOM_RELIEF = 25.0
 
 # --- Theatre ---
-THEATRE_WRITE_SECONDS = 180
-THEATRE_REHEARSE_SECONDS = 180
-THEATRE_PERFORMANCE_INTERVAL_SECONDS = 120
-THEATRE_LOYALTY_PER_PERFORMANCE = 8.0
+THEATRE_WRITE_SECONDS = 60
+THEATRE_REHEARSE_SECONDS = 60
+THEATRE_PERFORMANCE_INTERVAL_SECONDS = 60
+# While phase is ``ready`` (showing), applied each game tick (× elapsed seconds).
+THEATRE_LOYALTY_PER_SECOND = 0.12
+THEATRE_BOREDOM_RELIEF_PER_SECOND = 0.25
+# Total boredom shed over one showing interval at the steady rate above (for UI copy).
+THEATRE_BOREDOM_RELIEF_PER_PLAY = (
+    float(THEATRE_BOREDOM_RELIEF_PER_SECOND)
+    * float(THEATRE_PERFORMANCE_INTERVAL_SECONDS)
+)
 # Continuous draw (energy/s) per actor while any theatre programme is active (actors > 0).
 THEATRE_POWER_DRAW_PER_ACTOR = 0.003
 
@@ -225,6 +297,12 @@ THEATRE_PHASE_IDLE = "idle"
 THEATRE_PHASE_WRITING = "writing"
 THEATRE_PHASE_REHEARSING = "rehearsing"
 THEATRE_PHASE_READY = "ready"
+
+THEATRE_PLAY_TITLES: tuple[str, ...] = (
+    "King Lear",
+    "The Tempest",
+    "Mr. Burns: A Post-Electric Play",
+)
 
 
 @dataclass(frozen=True)

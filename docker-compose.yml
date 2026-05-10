@@ -38,10 +38,14 @@ services:
   grafana:
     image: grafana/grafana:11.2.0
     environment:
-      # No-login, anonymous viewer access. Anyone hitting :3000 sees the dashboard.
+      # Anonymous viewers (e.g. links/embeds): read-only. Log in at /login to edit
+      # dashboards in the UI; edits live in Grafana’s DB (`grafana_data` volume),
+      # not in `grafana/dashboards/*.json`. Password override: GRAFANA_ADMIN_PASSWORD.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_AUTH_BASIC_ENABLED: "false"
       # Allow embedding under Flask later if we want to reverse-proxy.
       GF_SECURITY_ALLOW_EMBEDDING: "true"

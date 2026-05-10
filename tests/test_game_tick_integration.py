@@ -153,6 +153,7 @@ def test_game_tick_commits_simulation_sample(app_ctx):
             user_id=uid,
             profession_line_id=theatre_line.id,
             phase="idle",
+            play_index=0,
             phase_entered_at=tick_origin,
             updated_at=tick_origin,
         )

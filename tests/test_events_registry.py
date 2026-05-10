@@ -31,6 +31,67 @@ def test_rats_events_registered():
     assert player_out.message
 
 
+def test_fireside_rhetoric_backlash_manual_event_registered():
+    from datetime import datetime, timezone
+
+    from app import constants
+    from app.events import (
+        EVENTS_BY_DEFINITION,
+        EventDefinition,
+        EventSpawnContext,
+    )
+
+    uid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    tick = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
+
+    key = EventDefinition.FIRESIDE_RHETORIC_BACKLASH.value
+    assert key == "fireside_rhetoric_backlash"
+    assert key in EVENTS_BY_DEFINITION
+    spec = EVENTS_BY_DEFINITION[key]
+    assert spec.spawn_chance_per_tick == 0.0
+    ctx = EventSpawnContext(
+        latest_food_level=100.0,
+        population_count=20,
+        rat_trapper_count=0,
+    )
+    assert spec.can_spawn(ctx) is False
+    assert spec.system is None
+    assert spec.duration_seconds == int(constants.FIRESIDE_RHETORIC_BACKLASH_DURATION_SECONDS)
+    auto_out = spec.auto_resolve(uid, tick)
+    assert auto_out.loyalty_delta == 0.0
+    assert auto_out.message
+
+
+def test_geiger_rumor_exodus_manual_event_registered():
+    from datetime import datetime, timezone
+
+    from app import constants
+    from app.events import (
+        EVENTS_BY_DEFINITION,
+        EventDefinition,
+        EventSpawnContext,
+    )
+
+    uid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    tick = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
+
+    key = EventDefinition.GEIGER_RUMOR_EXODUS.value
+    assert key == "geiger_rumor_exodus"
+    assert key in EVENTS_BY_DEFINITION
+    spec = EVENTS_BY_DEFINITION[key]
+    assert spec.spawn_chance_per_tick == 0.0
+    ctx = EventSpawnContext(
+        latest_food_level=100.0,
+        population_count=20,
+        rat_trapper_count=0,
+    )
+    assert spec.can_spawn(ctx) is False
+    assert spec.system is None
+    assert spec.duration_seconds == int(constants.GEIGER_RUMOR_CRISIS_DURATION_SECONDS)
+    auto_out = spec.auto_resolve(uid, tick)
+    assert auto_out.message
+
+
 def test_game_event_specs_carry_tuning_on_spec():
     """Random-event spawn/sim tuning lives on GameEventSpec; sweep sizing lives in constants."""
     from datetime import datetime, timezone

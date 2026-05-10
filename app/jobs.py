@@ -56,7 +56,11 @@ from .events import (
     active_event_tick_effects,
     auto_resolve_if_due,
     combined_rats_consumption_per_second_for_trappers,
+    enqueue_fireside_rhetoric_backlash,
+    enqueue_geiger_rumor_exodus,
     finalize_investigation_if_due,
+    geiger_rumor_forced_departures_this_tick,
+    halt_geiger_rumor_exodus,
     player_has_active_event_kind,
     player_has_any_active_event,
     rat_trapper_food_production_per_second,
@@ -544,13 +548,14 @@ def handle_boredom_and_doubt_tick(
         100.0,
         latest_doubt_sample.doubt + doubt_growth_max_per_second * doubt_factor * elapsed_seconds,
     )
-    db.session.add(
-        BunkerBoredom(user_id=user_id, boredom=new_boredom, timestamp=tick_time)
+    boredom_sample = BunkerBoredom(
+        user_id=user_id, boredom=new_boredom, timestamp=tick_time
     )
+    db.session.add(boredom_sample)
     db.session.add(
         BunkerDoubt(user_id=user_id, doubt=new_doubt, timestamp=tick_time)
     )
-    return (new_boredom, new_doubt)
+    return (new_boredom, new_doubt, boredom_sample)
 
 
 def handle_loyalty_change(
@@ -695,8 +700,13 @@ def handle_theatre_tick(
     actor_count: int,
     tick_time: datetime,
     energy_level: float,
-) -> tuple[float, float]:
-    """Returns (power_draw_per_second, loyalty_bonus_this_tick). Mutates ``theatre``."""
+    elapsed_seconds: float,
+) -> tuple[float, float, float]:
+    """Returns (power_draw_per_second, loyalty_gain_this_tick, boredom_relief_this_tick).
+
+    Loyalty accrues during ``writing``, ``rehearsing``, and ``ready`` (showing).
+    Boredom relief applies only during ``ready``. Energy draw applies whenever actors > 0.
+    """
     tw = float(constants.THEATRE_WRITE_SECONDS)
     tr = float(constants.THEATRE_REHEARSE_SECONDS)
     interval = float(constants.THEATRE_PERFORMANCE_INTERVAL_SECONDS)
@@ -707,7 +717,7 @@ def handle_theatre_tick(
         theatre.next_performance_at = None
         theatre.phase_entered_at = tick_time
         theatre.updated_at = tick_time
-        return (0.0, 0.0)
+        return (0.0, 0.0, 0.0)
 
     draw_ps = draw_per * float(actor_count)
     can_progress = energy_level > 1e-9
@@ -718,27 +728,38 @@ def handle_theatre_tick(
         theatre.next_performance_at = None
 
     loyalty_bonus = 0.0
+    boredom_bonus = 0.0
+    n_plays = len(constants.THEATRE_PLAY_TITLES)
+    lp_sec = float(constants.THEATRE_LOYALTY_PER_SECOND)
 
     if can_progress:
         phase_age = (tick_time - theatre.phase_entered_at).total_seconds()
 
         if theatre.phase == constants.THEATRE_PHASE_WRITING:
+            loyalty_bonus += lp_sec * elapsed_seconds
             if phase_age >= tw:
                 theatre.phase = constants.THEATRE_PHASE_REHEARSING
                 theatre.phase_entered_at = tick_time
         elif theatre.phase == constants.THEATRE_PHASE_REHEARSING:
+            loyalty_bonus += lp_sec * elapsed_seconds
             if phase_age >= tr:
                 theatre.phase = constants.THEATRE_PHASE_READY
                 theatre.phase_entered_at = tick_time
                 theatre.next_performance_at = tick_time + timedelta(seconds=interval)
         elif theatre.phase == constants.THEATRE_PHASE_READY:
+            loyalty_bonus += lp_sec * elapsed_seconds
+            boredom_bonus += (
+                float(constants.THEATRE_BOREDOM_RELIEF_PER_SECOND) * elapsed_seconds
+            )
             nxt = theatre.next_performance_at
             if nxt is not None and tick_time >= nxt:
-                loyalty_bonus = float(constants.THEATRE_LOYALTY_PER_PERFORMANCE)
+                if n_plays > 0:
+                    theatre.play_index = (int(theatre.play_index) + 1) % n_plays
+                theatre.phase_entered_at = tick_time
                 theatre.next_performance_at = tick_time + timedelta(seconds=interval)
 
     theatre.updated_at = tick_time
-    return (draw_ps, loyalty_bonus)
+    return (draw_ps, loyalty_bonus, boredom_bonus)
 
 
 def user_had_prior_departure_event(user_id: str) -> bool:
@@ -767,6 +788,7 @@ def handle_population_departures(
     radiation_safe_threshold: float,
     base_departure_rate: float,
     tick_time: datetime,
+    forced_extra_departures: int = 0,
 ) -> int:
     current_population = latest_population_sample.count
     if latest_radiation_level.level < radiation_safe_threshold and current_population > 0:
@@ -781,15 +803,20 @@ def handle_population_departures(
     else:
         departed_count = 0
 
+    post_after_normal = current_population - departed_count
+    extra = max(0, min(int(forced_extra_departures), post_after_normal))
+    total_departed = departed_count + extra
+    final_count = current_population - total_departed
+
     db.session.add(
         BunkerPopulation(
             user_id=user_id,
-            count=current_population - departed_count,
-            departed=departed_count,
+            count=final_count,
+            departed=total_departed,
             timestamp=tick_time,
         )
     )
-    return departed_count
+    return total_departed
 
 
 def normalize_worker_assignments(
@@ -979,6 +1006,23 @@ def record_loyalty_sample(
     db.session.add(BunkerLoyalty(user_id=user_id, loyalty=loyalty, timestamp=tick_time))
 
 
+def _fireside_broadcast_overlap_fraction(
+    elapsed_seconds: float,
+    tick_time: datetime,
+    broadcast_end: datetime,
+    broadcast_duration_seconds: float,
+) -> float:
+    """Fraction of the Fireside window overlapped by this tick's simulation slice."""
+    dur = max(1e-9, float(broadcast_duration_seconds))
+    broadcast_start = broadcast_end - timedelta(seconds=int(broadcast_duration_seconds))
+    t_prev = tick_time - timedelta(seconds=max(0.0, float(elapsed_seconds)))
+    seg_lo = max(broadcast_start, t_prev)
+    seg_hi = min(tick_time, broadcast_end)
+    if seg_hi <= seg_lo:
+        return 0.0
+    return max(0.0, min(1.0, (seg_hi - seg_lo).total_seconds() / dur))
+
+
 def game_tick(app: Flask) -> None:
     """One game tick: update all time-varying game systems for every player.
 
@@ -1090,6 +1134,9 @@ def game_tick(app: Flask) -> None:
             usr = readings.user
             sermon_loyalty_bonus = 0.0
             sermon_boredom_relief = 0.0
+            pending_fireside_completion_kind: str | None = None
+            fireside_loyalty_tick = 0.0
+            fireside_frank_doubt_tick = 0.0
             if (
                 usr.sermon_reward_pending
                 and usr.sermon_busy_until is not None
@@ -1100,7 +1147,46 @@ def game_tick(app: Flask) -> None:
                 usr.sermon_reward_pending = False
                 usr.sermon_busy_until = None
 
-            new_boredom, _ = handle_boredom_and_doubt_tick(
+            bu_fs = usr.fireside_busy_until
+            kind_fs = usr.fireside_pending_kind
+            dur_fs = float(constants.FIRESIDE_CHAT_DURATION_SECONDS)
+            if bu_fs is not None:
+                completing_fs = tick_time >= bu_fs
+                if kind_fs:
+                    frac_delta = _fireside_broadcast_overlap_fraction(
+                        elapsed_seconds, tick_time, bu_fs, dur_fs
+                    )
+                    loyalty_total = 0.0
+                    frank_doubt_total = 0.0
+                    if kind_fs == constants.FIRESIDE_KIND_REASSURING:
+                        loyalty_total = float(constants.FIRESIDE_REASSURING_LOYALTY_DELTA)
+                    elif kind_fs == constants.FIRESIDE_KIND_FRANK:
+                        loyalty_total = float(constants.FIRESIDE_FRANK_LOYALTY_DELTA)
+                        frank_doubt_total = float(constants.FIRESIDE_FRANK_DOUBT_DELTA)
+                    elif kind_fs == constants.FIRESIDE_KIND_FEARMONGERING:
+                        loyalty_total = float(constants.FIRESIDE_FEARMONGER_LOYALTY_DELTA)
+
+                    fireside_loyalty_tick += loyalty_total * frac_delta
+                    fireside_frank_doubt_tick += frank_doubt_total * frac_delta
+                    new_accrued = float(usr.fireside_effect_fraction_accrued) + frac_delta
+
+                    if completing_fs:
+                        rem = max(0.0, 1.0 - new_accrued)
+                        fireside_loyalty_tick += loyalty_total * rem
+                        fireside_frank_doubt_tick += frank_doubt_total * rem
+                        pending_fireside_completion_kind = kind_fs
+                        usr.fireside_effect_fraction_accrued = 0.0
+                    else:
+                        usr.fireside_effect_fraction_accrued = min(new_accrued, 1.0)
+
+                if completing_fs:
+                    usr.fireside_busy_until = None
+                    usr.fireside_pending_kind = None
+                    if not kind_fs:
+                        usr.fireside_effect_fraction_accrued = 0.0
+                    halt_geiger_rumor_exodus(user_id)
+
+            new_boredom, new_doubt, boredom_row = handle_boredom_and_doubt_tick(
                 user_id,
                 readings.latest_boredom_sample,
                 readings.latest_doubt_sample,
@@ -1112,6 +1198,35 @@ def game_tick(app: Flask) -> None:
                 tick_time,
                 boredom_relief=sermon_boredom_relief,
             )
+
+            if fireside_frank_doubt_tick > 1e-12:
+                nd = min(100.0, float(new_doubt) + fireside_frank_doubt_tick)
+                db.session.add(
+                    BunkerDoubt(user_id=user_id, doubt=nd, timestamp=tick_time)
+                )
+
+            if pending_fireside_completion_kind == constants.FIRESIDE_KIND_FEARMONGERING:
+                if random.random() < float(constants.FIRESIDE_FEARMONGER_BACKFIRE_CHANCE):
+                    enqueue_fireside_rhetoric_backlash(user_id, tick_time)
+                else:
+                    nd = min(
+                        100.0,
+                        float(new_doubt)
+                        + float(constants.FIRESIDE_FEARMONGER_DOUBT_DELTA_SOFT),
+                    )
+                    db.session.add(
+                        BunkerDoubt(user_id=user_id, doubt=nd, timestamp=tick_time)
+                    )
+
+            if (
+                not usr.geiger_rumor_crisis_triggered
+                and new_radiation_truth < float(new_doubt)
+            ):
+                enqueue_geiger_rumor_exodus(
+                    user_id,
+                    tick_time,
+                    readings.latest_population_sample.count,
+                )
 
             adjusted_loyalty = handle_loyalty_change(
                 readings.latest_loyalty_sample,
@@ -1129,6 +1244,7 @@ def game_tick(app: Flask) -> None:
             had_prior_departure_event = user_had_prior_departure_event(user_id)
             had_prior_welcome_message = user_had_prior_welcome_message(user_id)
 
+            rumor_chunk = geiger_rumor_forced_departures_this_tick(user_id, tick_time)
             departed_this_tick = handle_population_departures(
                 user_id,
                 readings.latest_radiation_level,
@@ -1137,6 +1253,7 @@ def game_tick(app: Flask) -> None:
                 radiation_safe_threshold,
                 base_departure_rate,
                 tick_time,
+                forced_extra_departures=rumor_chunk,
             )
 
             post_pop = readings.latest_population_sample.count - departed_this_tick
@@ -1162,6 +1279,7 @@ def game_tick(app: Flask) -> None:
             )
             theatre_draw_ps = 0.0
             theatre_loyalty_bonus = 0.0
+            theatre_boredom_bonus = 0.0
             if _facilities_ready(readings):
                 normalize_worker_assignments(
                     crank_line,
@@ -1189,11 +1307,19 @@ def game_tick(app: Flask) -> None:
                         if readings.latest_energy_reserve is not None
                         else 0.0
                     )
-                    theatre_draw_ps, theatre_loyalty_bonus = handle_theatre_tick(
-                        readings.theatre,
-                        _theatre_worker_count(readings),
-                        tick_time,
-                        en_lvl,
+                    theatre_draw_ps, theatre_loyalty_bonus, theatre_boredom_bonus = (
+                        handle_theatre_tick(
+                            readings.theatre,
+                            _theatre_worker_count(readings),
+                            tick_time,
+                            en_lvl,
+                            elapsed_seconds,
+                        )
+                    )
+                if theatre_boredom_bonus > 1e-9:
+                    boredom_row.boredom = max(
+                        0.0,
+                        float(boredom_row.boredom) - theatre_boredom_bonus,
                     )
             record_bunker_profession_snapshots(
                 user_id, post_pop, readings, tick_time
@@ -1266,7 +1392,8 @@ def game_tick(app: Flask) -> None:
                     adjusted_loyalty
                     + auto_loyalty_adj
                     + sermon_loyalty_bonus
-                    + theatre_loyalty_bonus,
+                    + theatre_loyalty_bonus
+                    + fireside_loyalty_tick,
                 ),
             )
             record_loyalty_sample(user_id, final_loyalty, tick_time)
