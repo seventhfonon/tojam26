@@ -610,6 +610,53 @@ def _ensure_user_fireside_columns() -> None:
             )
 
 
+def _ensure_system_messages_channel_column() -> None:
+    """Route Silo Bulletin vs Inner Circle Group Chat (same table, filtered by ``channel``)."""
+    if "system_messages" not in inspect(db.engine).get_table_names():
+        return
+    cols = {c["name"] for c in inspect(db.engine).get_columns("system_messages")}
+    if "channel" in cols:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE system_messages ADD COLUMN channel VARCHAR(32) "
+                "NOT NULL DEFAULT 'bulletin'"
+            )
+        )
+
+
+def _ensure_bunker_social_inner_circle_cash_column() -> None:
+    """Liquid currency on ``bunker_social_state`` (Inner Circle temp jobs)."""
+    insp = inspect(db.engine)
+    if "bunker_social_state" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("bunker_social_state")}
+    if "inner_circle_cash" in cols:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_social_state ADD COLUMN inner_circle_cash "
+                "DOUBLE PRECISION NOT NULL DEFAULT 0"
+            )
+        )
+
+
+def _ensure_inner_circle_members_seed() -> None:
+    """Create default Inner Circle member rows for every player."""
+    from . import inner_circle
+    from .models import User
+
+    tables = inspect(db.engine).get_table_names()
+    if "users" not in tables or "inner_circle_members" not in tables:
+        return
+    user_ids = db.session.scalars(select(User.id)).all()
+    for uid in user_ids:
+        inner_circle.seed_members_for_user_if_needed(uid)
+    db.session.commit()
+
+
 def _ensure_bunker_social_last_fireside_chat_at_column() -> None:
     """Cooldown anchor between Fireside Chat starts."""
     insp = inspect(db.engine)
@@ -695,7 +742,7 @@ def _ensure_player_active_events_auto_resolve_nullable() -> None:
 
 
 def _ensure_social_movie_pixel_samples_movie_id_column() -> None:
-    """Tag theatre strips by catalog ``movie_id`` (one advancing clip per ``MOVIES`` row)."""
+    """Tag theater strips by catalog ``movie_id`` (one advancing clip per ``MOVIES`` row)."""
     insp = inspect(db.engine)
     tables = insp.get_table_names()
     if "social_movie_pixel_samples" not in tables:
@@ -765,6 +812,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     with app.app_context():
         _migrate_legacy_profession_history_if_needed()
         db.create_all()
+        _ensure_system_messages_channel_column()
         _ensure_radiation_level_display_column()
         _ensure_bunker_systems_farming_columns()
         _ensure_food_reserve_rate_columns()
@@ -786,6 +834,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_user_rat_trappers_unlocked_column()
         _ensure_user_fireside_columns()
         _ensure_user_geiger_rumor_exodus_columns()
+        _ensure_bunker_social_inner_circle_cash_column()
+        _ensure_inner_circle_members_seed()
         _ensure_bunker_social_last_fireside_chat_at_column()
         _ensure_bunker_theatre_play_index_column()
         _ensure_player_active_events_auto_resolve_nullable()

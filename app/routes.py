@@ -33,6 +33,7 @@ from sqlalchemy.orm import selectinload
 
 from .extensions import db
 from . import constants
+from . import inner_circle
 from .events import (
     EventDefinition,
     combined_rats_consumption_per_second_for_trappers,
@@ -343,6 +344,7 @@ def _get_or_create_social_state(user_id: str) -> BunkerSocialState:
             inner_circle_loyalty=constants.INITIAL_INNER_CIRCLE_LOYALTY,
         )
         db.session.add(row)
+        inner_circle.seed_members_for_user_if_needed(user_id)
         db.session.commit()
     return row
 
@@ -426,6 +428,7 @@ def _create_player() -> User:
             inner_circle_loyalty=constants.INITIAL_INNER_CIRCLE_LOYALTY,
         )
     )
+    inner_circle.seed_members_for_user_if_needed(user.id)
     record_environment_pixel_noise_sample(
         user.id,
         datetime.now(timezone.utc),
@@ -834,7 +837,7 @@ def action_adjust_theatre():
     theatre_sys.updated_at = now
     db.session.commit()
     log.info(
-        "adjust theatre actors: user=%s delta=%+d actors=%d",
+        "adjust theater actors: user=%s delta=%+d actors=%d",
         user.id,
         delta,
         theatre_line.count,
@@ -1098,10 +1101,114 @@ def action_meet_council():
     else:
         body = random.choice(NEGATIVE_COUNCIL_MESSAGES)
 
-    db.session.add(SystemMessage(user_id=user.id, body=body, timestamp=now))
+    db.session.add(
+        SystemMessage(
+            user_id=user.id,
+            body=body,
+            timestamp=now,
+            channel=constants.MESSAGE_CHANNEL_BULLETIN,
+        )
+    )
     db.session.commit()
     log.info("meet council: user=%s inner_circle delta=%+d -> %d", user.id, delta, new_inner)
 
+    return _action_response(user.id)
+
+
+def _inner_circle_slot_query() -> int | None:
+    try:
+        return int(request.args.get("slot", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+@bp.route("/inner-circle/status")
+def inner_circle_http_status():
+    user = _identify_player()
+    if user is None:
+        return jsonify({"error": "no_player"}), 400
+    now = datetime.now(timezone.utc)
+    _get_or_create_social_state(user.id)
+    return jsonify(inner_circle.inner_circle_status_payload(user.id, now))
+
+
+@bp.route("/action/inner-circle/grant-luxuries")
+def action_inner_circle_grant_luxuries():
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+    slot = _inner_circle_slot_query()
+    if slot is None:
+        return _action_response(user.id)
+    now = datetime.now(timezone.utc)
+    err = inner_circle.try_grant_luxuries(user.id, slot, now)
+    if err is None:
+        db.session.commit()
+    else:
+        db.session.rollback()
+    return _action_response(user.id)
+
+
+@bp.route("/action/inner-circle/stage-incident")
+def action_inner_circle_stage_incident():
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+    slot = _inner_circle_slot_query()
+    if slot is None:
+        return _action_response(user.id)
+    now = datetime.now(timezone.utc)
+    err = inner_circle.try_start_stage_incident(user.id, slot, now)
+    if err is None:
+        db.session.commit()
+    else:
+        db.session.rollback()
+    return _action_response(user.id)
+
+
+@bp.route("/action/inner-circle/buy-groceries")
+def action_inner_circle_buy_groceries():
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+    slot = _inner_circle_slot_query()
+    if slot is None:
+        return _action_response(user.id)
+    now = datetime.now(timezone.utc)
+    err = inner_circle.try_start_buy_groceries(user.id, slot, now)
+    if err is None:
+        db.session.commit()
+    else:
+        db.session.rollback()
+    return _action_response(user.id)
+
+
+@bp.route("/action/inner-circle/temp-job")
+def action_inner_circle_temp_job():
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+    slot = _inner_circle_slot_query()
+    if slot is None:
+        return _action_response(user.id)
+    now = datetime.now(timezone.utc)
+    err = inner_circle.try_start_temp_job(user.id, slot, now)
+    if err is None:
+        db.session.commit()
+    else:
+        db.session.rollback()
     return _action_response(user.id)
 
 
@@ -1619,35 +1726,62 @@ def action_dispatch_investigation():
     return _action_response(user.id)
 
 
+def _system_messages_payload(rows: list[SystemMessage]) -> list[dict[str, object]]:
+    out: list[dict[str, object]] = []
+    for m in reversed(rows):
+        urgency, display_body = constants.parse_system_message_body(m.body)
+        out.append(
+            {
+                "ts": m.timestamp.strftime("%H:%M"),
+                "body": display_body,
+                "urgency": urgency,
+                "emoji": constants.system_message_urgency_emoji(urgency),
+            }
+        )
+    return out
+
+
 @bp.route("/system-messages")
 def system_messages():
-    """Return the 5 most recent system messages for the current player.
+    """Return the 5 most recent Silo Bulletin lines for the current player.
 
-    Returns JSON: list of ``{ts, body, urgency, emoji}`` ordered oldest-first (so the
-    frontend can render them top-to-bottom with the newest at the bottom).
-    ``body`` has ``!`` / ``!!`` urgency prefixes stripped; ``emoji`` matches ``urgency``.
-    The CORS header allows the Grafana origin to fetch this directly.
+    Rows use ``MESSAGE_CHANNEL_BULLETIN`` on ``system_messages``. JSON list of
+    ``{ts, body, urgency, emoji}`` ordered oldest-first for terminal rendering.
     """
     user = _identify_player()
-    msgs = []
+    msgs: list[dict[str, object]] = []
     if user is not None:
         rows = db.session.scalars(
             select(SystemMessage)
-            .where(SystemMessage.user_id == user.id)
+            .where(
+                SystemMessage.user_id == user.id,
+                SystemMessage.channel == constants.MESSAGE_CHANNEL_BULLETIN,
+            )
             .order_by(SystemMessage.timestamp.desc())
             .limit(5)
         ).all()
-        msgs = []
-        for m in reversed(rows):
-            urgency, display_body = constants.parse_system_message_body(m.body)
-            msgs.append(
-                {
-                    "ts": m.timestamp.strftime("%H:%M"),
-                    "body": display_body,
-                    "urgency": urgency,
-                    "emoji": constants.system_message_urgency_emoji(urgency),
-                }
+        msgs = _system_messages_payload(rows)
+    resp = jsonify(msgs)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@bp.route("/inner-circle/group-chat-messages")
+def inner_circle_group_chat_messages():
+    """Recent Inner Circle Group Chat lines (``MESSAGE_CHANNEL_GROUP_CHAT``)."""
+    user = _identify_player()
+    msgs: list[dict[str, object]] = []
+    if user is not None:
+        rows = db.session.scalars(
+            select(SystemMessage)
+            .where(
+                SystemMessage.user_id == user.id,
+                SystemMessage.channel == constants.MESSAGE_CHANNEL_GROUP_CHAT,
             )
+            .order_by(SystemMessage.timestamp.desc())
+            .limit(5)
+        ).all()
+        msgs = _system_messages_payload(rows)
     resp = jsonify(msgs)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp

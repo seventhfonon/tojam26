@@ -107,8 +107,11 @@ def test_enqueue_fireside_rhetoric_backlash_inserts_event_and_warning_message():
     assert len(active) == 1
     assert active[0].kind == EventDefinition.FIRESIDE_RHETORIC_BACKLASH
     msgs = [o for o in captured if isinstance(o, SystemMessage)]
-    assert len(msgs) == 1
-    assert "holes in your speech" in msgs[0].body
+    assert len(msgs) == 2
+    bulletin = next(m for m in msgs if m.channel == constants.MESSAGE_CHANNEL_BULLETIN)
+    assert "holes in your speech" in bulletin.body
+    gc = next(m for m in msgs if m.channel == constants.MESSAGE_CHANNEL_GROUP_CHAT)
+    assert len(gc.body) > 0
 
 
 def _seed_minimal_player(uid: str, tick_origin: datetime) -> None:
@@ -274,7 +277,10 @@ def test_fireside_fearmonger_backfire_enqueues_event(app_ctx):
 
     msg = db.session.scalars(
         select(SystemMessage)
-        .where(SystemMessage.user_id == uid)
+        .where(
+            SystemMessage.user_id == uid,
+            SystemMessage.channel == constants.MESSAGE_CHANNEL_BULLETIN,
+        )
         .order_by(SystemMessage.timestamp.desc())
         .limit(1)
     ).first()

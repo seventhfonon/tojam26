@@ -81,7 +81,7 @@
     {
       "id": 8,
       "type": "text",
-      "title": "\ud83d\udce1 System Messages",
+      "title": "\ud83d\udce1 Silo Bulletin",
       "datasource": null,
       "gridPos": {
         "x": 0,
@@ -2155,7 +2155,7 @@
       "pluginVersion": "11.2.0",
       "id": 87,
       "title": "# Actors",
-      "description": "Theatre actors (bunker_professions theatre line).",
+      "description": "Theater actors (bunker_professions theater line).",
       "gridPos": {
         "x": 5,
         "y": 42,
@@ -2194,7 +2194,7 @@
     },
     {
       "type": "bargauge",
-      "description": "Current theatre phase progress. Writing/rehearsing/showing cadence uses THEATRE_*_SECONDS (60s each) in app/constants.py.",
+      "description": "Current theater phase progress. Writing/rehearsing/showing cadence uses THEATRE_*_SECONDS (60s each) in app/constants.py.",
       "datasource": {
         "type": "postgres",
         "uid": "silo-postgres"
@@ -2388,7 +2388,7 @@
       "pluginVersion": "11.2.0",
       "id": 86,
       "title": "Energy use (per sec)",
-      "description": "Theatre draw: THEATRE_POWER_DRAW_PER_ACTOR \u00d7 actor count whenever actors are assigned (continuous while production runs).",
+      "description": "Theater draw: THEATRE_POWER_DRAW_PER_ACTOR \u00d7 actor count whenever actors are assigned (continuous while production runs).",
       "gridPos": {
         "x": 8,
         "y": 46,

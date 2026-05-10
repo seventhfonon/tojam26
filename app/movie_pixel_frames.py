@@ -1,4 +1,4 @@
-"""PNG sequences for the Social dashboard theatre heatmap (``app/assets/images``)."""
+"""PNG sequences for the Social dashboard theater heatmap (``app/assets/images``)."""
 
 from __future__ import annotations
 

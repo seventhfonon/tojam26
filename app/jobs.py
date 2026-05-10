@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from .extensions import db
 from . import bad_apple_frames
 from . import constants
+from . import inner_circle
 from . import movie_pixel_frames
 from .environment_pixel_reference import (
     apply_uniform_tick_noise,
@@ -755,8 +756,9 @@ def handle_theatre_tick(
             if nxt is not None and tick_time >= nxt:
                 if n_plays > 0:
                     theatre.play_index = (int(theatre.play_index) + 1) % n_plays
+                theatre.phase = constants.THEATRE_PHASE_WRITING
                 theatre.phase_entered_at = tick_time
-                theatre.next_performance_at = tick_time + timedelta(seconds=interval)
+                theatre.next_performance_at = None
 
     theatre.updated_at = tick_time
     return (draw_ps, loyalty_bonus, boredom_bonus)
@@ -829,7 +831,7 @@ def normalize_worker_assignments(
     population_cap: int,
     tick_time: datetime,
 ) -> None:
-    """Clamp crank, farm, rat trappers, theatre to shared pool minus Investigation; refresh Idle."""
+    """Clamp crank, farm, rat trappers, theater to shared pool minus Investigation; refresh Idle."""
     inv_n = investigation_line.count if investigation_line is not None else 0
     inv_n = max(0, inv_n)
     pool = max(0, population_cap - inv_n)
@@ -877,7 +879,7 @@ def record_bunker_profession_snapshots(
     readings: GameTickReadings,
     tick_time: datetime,
 ) -> None:
-    """Append profession rows (crank, farming, theatre, investigation, idle) for Grafana."""
+    """Append profession rows (crank, farming, theater, investigation, idle) for Grafana."""
     crank = _crank_worker_count(readings)
     farm = _farm_worker_count(readings)
     rat_n = _rat_trapper_count(readings)
@@ -1199,28 +1201,33 @@ def game_tick(app: Flask) -> None:
                 boredom_relief=sermon_boredom_relief,
             )
 
+            working_doubt = float(new_doubt)
             if fireside_frank_doubt_tick > 1e-12:
-                nd = min(100.0, float(new_doubt) + fireside_frank_doubt_tick)
+                working_doubt = min(100.0, working_doubt + fireside_frank_doubt_tick)
                 db.session.add(
-                    BunkerDoubt(user_id=user_id, doubt=nd, timestamp=tick_time)
+                    BunkerDoubt(user_id=user_id, doubt=working_doubt, timestamp=tick_time)
                 )
 
             if pending_fireside_completion_kind == constants.FIRESIDE_KIND_FEARMONGERING:
                 if random.random() < float(constants.FIRESIDE_FEARMONGER_BACKFIRE_CHANCE):
                     enqueue_fireside_rhetoric_backlash(user_id, tick_time)
                 else:
-                    nd = min(
+                    working_doubt = min(
                         100.0,
-                        float(new_doubt)
+                        working_doubt
                         + float(constants.FIRESIDE_FEARMONGER_DOUBT_DELTA_SOFT),
                     )
                     db.session.add(
-                        BunkerDoubt(user_id=user_id, doubt=nd, timestamp=tick_time)
+                        BunkerDoubt(user_id=user_id, doubt=working_doubt, timestamp=tick_time)
                     )
+
+            working_doubt, inner_circle_loyalty_bonus = inner_circle.complete_due_tasks(
+                user_id, tick_time, working_doubt
+            )
 
             if (
                 not usr.geiger_rumor_crisis_triggered
-                and new_radiation_truth < float(new_doubt)
+                and new_radiation_truth < working_doubt
             ):
                 enqueue_geiger_rumor_exodus(
                     user_id,
@@ -1234,12 +1241,14 @@ def game_tick(app: Flask) -> None:
                 crank_workers_loyalty_threshold,
                 loyalty_penalty_per_excess_crank_worker,
             )
-            adjusted_loyalty = max(
+            boredom_drag_amt = boredom_loyalty_drag(new_boredom, elapsed_seconds)
+            movie_drag_amt = movie_exhaustion_loyalty_drag(exhaust_sum, elapsed_seconds)
+            base_pop_loyalty = max(
                 0.0,
-                adjusted_loyalty
-                - boredom_loyalty_drag(new_boredom, elapsed_seconds)
-                - movie_exhaustion_loyalty_drag(exhaust_sum, elapsed_seconds),
+                adjusted_loyalty - boredom_drag_amt - movie_drag_amt,
             )
+            inner_pen = inner_circle.popularity_loyalty_penalty(user_id)
+            adjusted_loyalty = max(0.0, base_pop_loyalty - inner_pen)
 
             had_prior_departure_event = user_had_prior_departure_event(user_id)
             had_prior_welcome_message = user_had_prior_welcome_message(user_id)
@@ -1393,10 +1402,19 @@ def game_tick(app: Flask) -> None:
                     + auto_loyalty_adj
                     + sermon_loyalty_bonus
                     + theatre_loyalty_bonus
-                    + fireside_loyalty_tick,
+                    + fireside_loyalty_tick
+                    + inner_circle_loyalty_bonus,
                 ),
             )
             record_loyalty_sample(user_id, final_loyalty, tick_time)
+            inner_circle.drift_member_loyalties(
+                user_id,
+                base_pop_loyalty,
+                elapsed_seconds,
+                tick_time,
+            )
+            inner_circle.sync_aggregate_inner_circle_loyalty(user_id)
+            inner_circle.record_cash_sample(user_id, tick_time)
 
             ev_active = player_has_any_active_event(user_id)
             energy_val = readings.latest_energy_reserve
@@ -1445,6 +1463,7 @@ def post_test_message(app: Flask) -> None:
                 user_id=user.id,
                 body="All systems normal.",
                 timestamp=now,
+                channel=constants.MESSAGE_CHANNEL_BULLETIN,
             ))
         db.session.commit()
         log.debug("posted test message to %d user(s)", len(users))

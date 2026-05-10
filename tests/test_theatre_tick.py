@@ -1,4 +1,4 @@
-"""Theatre tick cadence (phase boundaries for Grafana / UI)."""
+"""Theater tick cadence (phase boundaries for Grafana / UI)."""
 
 from __future__ import annotations
 

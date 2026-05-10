@@ -188,7 +188,7 @@ ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE = 0.06
 # When all frames exist, the heatmap uses one frame per scheduler tick (see ``game_tick``).
 BAD_APPLE_FRAME_COUNT = 20
 
-# Social dashboard theatre heatmap: same strip geometry as environment pixels.
+# Social dashboard theater heatmap: same strip geometry as environment pixels.
 # Keep ``social_movie_heatmap_history_seconds`` on the Social Grafana dashboard equal to
 # ``SOCIAL_MOVIE_PIXEL_BACKFILL_SPAN_SECONDS``.
 SOCIAL_MOVIE_PIXEL_GRID_COLS = ENVIRONMENT_PIXEL_GRID_COLS
@@ -212,11 +212,63 @@ def harvest_yield_from_avg_farm_workers(avg_workers: float) -> float:
 # Periodic INFO summaries from ``game_tick`` (seconds between logs); 0 = off.
 GAMESTATE_LOG_INTERVAL_SECONDS = 10
 
+# Where server-authored ``SystemMessage`` rows appear (Grafana Silo Bulletin vs Inner Circle Group Chat).
+MESSAGE_CHANNEL_BULLETIN = "bulletin"
+MESSAGE_CHANNEL_GROUP_CHAT = "group_chat"
+
 # --- Social (boredom / doubt / inner circle) ---
 INITIAL_BOREDOM = 0.0
 INITIAL_DOUBT = 0.0
-# Hidden stat: trust among the inner council (0–100).
+# Hidden stat: legacy aggregate for meet-council; synced from member mean in ``game_tick``.
 INITIAL_INNER_CIRCLE_LOYALTY = 50
+
+# --- Inner Circle (per-member simulation; Silo: Inner Circle dashboard) ---
+INNER_CIRCLE_MEMBER_NAMES: tuple[str, ...] = (
+    "Marnie Coldwell",
+    "Jace Orbin",
+    "Vesper Kline",
+    "Tamsin Greer",
+    "Nadia Firth",
+)
+INNER_CIRCLE_MEMBER_COUNT = len(INNER_CIRCLE_MEMBER_NAMES)
+INNER_CIRCLE_INITIAL_MEMBER_LOYALTIES: tuple[float, ...] = (58.0, 62.0, 60.0, 59.0, 61.0)
+INNER_CIRCLE_INITIAL_MEMBER_POPULARITIES: tuple[float, ...] = (52.0, 48.0, 55.0, 50.0, 53.0)
+# Members drift toward bunker loyalty plus this bias (stay more loyal than the general population).
+INNER_CIRCLE_LOYALTY_BIAS = 9.0
+INNER_CIRCLE_LOYALTY_DRIFT_PER_SECOND = 0.04
+# Each popularity point below 50 applies this penalty to bunker loyalty (summed per member).
+INNER_CIRCLE_UNPOPULAR_LOYALTY_PENALTY_PER_POINT = 0.12
+# Minimum popularity to start "Stage incident".
+INNER_CIRCLE_POPULARITY_MIN_STAGE_INCIDENT = 28.0
+
+INNER_CIRCLE_TASK_STAGE_INCIDENT = "stage_incident"
+INNER_CIRCLE_TASK_BUY_GROCERIES = "buy_groceries"
+INNER_CIRCLE_TASK_TEMP_JOB = "temp_job"
+
+INNER_CIRCLE_GRANT_LUXURIES_FOOD_COST = 28.0
+INNER_CIRCLE_GRANT_LUXURIES_ENERGY_COST = 10.0
+INNER_CIRCLE_GRANT_LUXURIES_MEMBER_LOYALTY_DELTA = 7.0
+INNER_CIRCLE_GRANT_LUXURIES_BUNKER_LOYALTY_DELTA = 3.5
+
+INNER_CIRCLE_STAGE_INCIDENT_DURATION_SECONDS = 48
+INNER_CIRCLE_STAGE_INCIDENT_MEMBER_LOYALTY_DELTA = 9.0
+INNER_CIRCLE_STAGE_INCIDENT_DOUBT_RELIEF = 6.0
+INNER_CIRCLE_STAGE_INCIDENT_BUNKER_LOYALTY_DELTA = 2.0
+INNER_CIRCLE_STAGE_INCIDENT_DISCOVER_CHANCE = 0.34
+INNER_CIRCLE_STAGE_INCIDENT_DISCOVER_POPULARITY_DROP = 22.0
+INNER_CIRCLE_STAGE_INCIDENT_DISCOVER_DOUBT_BUMP = 11.0
+
+INNER_CIRCLE_BUY_GROCERIES_DURATION_SECONDS = 72
+INNER_CIRCLE_BUY_GROCERIES_FOOD_GAIN = 42.0
+INNER_CIRCLE_BUY_GROCERIES_ENERGY_GAIN = 14.0
+INNER_CIRCLE_BUY_GROCERIES_DOUBT_BAD_CHANCE = 0.52
+INNER_CIRCLE_BUY_GROCERIES_DOUBT_BAD_AMOUNT = 12.0
+
+INNER_CIRCLE_TEMP_JOB_DURATION_SECONDS = 96
+INNER_CIRCLE_TEMP_JOB_CASH_GAIN = 38.0
+INNER_CIRCLE_TEMP_JOB_MEMBER_LOYALTY_DROP = 10.0
+INNER_CIRCLE_TEMP_JOB_DOUBT_BAD_CHANCE = 0.48
+INNER_CIRCLE_TEMP_JOB_DOUBT_BAD_AMOUNT = 15.0
 
 # Boredom rises slowly while nothing entertains the population.
 BOREDOM_PER_SECOND = 0.02
@@ -290,7 +342,7 @@ THEATRE_BOREDOM_RELIEF_PER_PLAY = (
     float(THEATRE_BOREDOM_RELIEF_PER_SECOND)
     * float(THEATRE_PERFORMANCE_INTERVAL_SECONDS)
 )
-# Continuous draw (energy/s) per actor while any theatre programme is active (actors > 0).
+# Continuous draw (energy/s) per actor while any theater program is active (actors > 0).
 THEATRE_POWER_DRAW_PER_ACTOR = 0.003
 
 THEATRE_PHASE_IDLE = "idle"

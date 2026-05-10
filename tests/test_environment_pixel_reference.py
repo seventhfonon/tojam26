@@ -48,7 +48,7 @@ def test_environment_pixel_reference_constant_color(tmp_path, monkeypatch):
             assert abs(v - expected) < 1e-5
 
 
-def test_environment_pixel_reference_corners_black_centre_white(tmp_path, monkeypatch):
+def test_environment_pixel_reference_corners_black_center_white(tmp_path, monkeypatch):
     """2×2 grid on 2×2 image: TL/TR/BL black, BR white."""
     pytest.importorskip("PIL", reason="reference image sampling uses Pillow")
     from PIL import Image

@@ -17,6 +17,7 @@ from typing import Callable
 from sqlalchemy import select
 
 from .extensions import db
+from .constants import MESSAGE_CHANNEL_BULLETIN
 from .models import SystemMessage, UserNarrativeDelivery
 
 
@@ -95,6 +96,7 @@ def deliver_pending_narrative_messages(ctx: NarrativeContext) -> None:
                 user_id=ctx.user_id,
                 body=message.text,
                 timestamp=ctx.tick_time,
+                channel=MESSAGE_CHANNEL_BULLETIN,
             )
         )
         db.session.add(

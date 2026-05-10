@@ -54,7 +54,7 @@ def _pixel_at(rgb_bytes: bytes, width: int, x: int, y: int) -> tuple[int, int, i
 def luminance_grid_from_rgb_buffer(
     img_w: int, img_h: int, rgb_bytes: bytes, grid_cols: int, grid_rows: int
 ) -> list[list[float]]:
-    """Row-major luminance samples at grid-cell centres from packed RGB bytes."""
+    """Row-major luminance samples at grid-cell centers from packed RGB bytes."""
     cells: list[list[float]] = []
     for r in range(grid_rows):
         row: list[float] = []
@@ -117,7 +117,7 @@ def luminance_grid_from_rgb_buffer_aspect_crop(
 
 
 def environment_pixel_cells_from_reference_image(grid_cols: int, grid_rows: int) -> list[list[float]] | None:
-    """Return row-major ``[row][col]`` luminance samples at grid-cell centres, or ``None`` if unavailable."""
+    """Return row-major ``[row][col]`` luminance samples at grid-cell centers, or ``None`` if unavailable."""
     if grid_cols < 1 or grid_rows < 1:
         return None
 

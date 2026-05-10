@@ -164,6 +164,11 @@ class User(db.Model):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    inner_circle_members: Mapped[list["InnerCircleMember"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="InnerCircleMember.slot_index",
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.id}>"
@@ -343,6 +348,8 @@ class BunkerSocialState(db.Model):
     last_fireside_chat_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    #: Off-books currency for Inner Circle actions (temp jobs, etc.).
+    inner_circle_cash: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     user: Mapped[User] = relationship(back_populates="bunker_social_state")
 
@@ -351,6 +358,51 @@ class BunkerSocialState(db.Model):
             f"<BunkerSocialState user={self.user_id} "
             f"inner_circle={self.inner_circle_loyalty}>"
         )
+
+
+class InnerCircleMember(db.Model):
+    """One influential resident the leader manages directly (no formal titles)."""
+
+    __tablename__ = "inner_circle_members"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    slot_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    loyalty: Mapped[float] = mapped_column(Float, nullable=False)
+    popularity: Mapped[float] = mapped_column(Float, nullable=False)
+    task_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    task_started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    task_ends_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["User"] = relationship(back_populates="inner_circle_members")
+
+
+class InnerCircleCashSample(db.Model):
+    """Time series of Inner Circle cash for Grafana."""
+
+    __tablename__ = "inner_circle_cash_samples"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    cash: Mapped[float] = mapped_column(Float, nullable=False)
+
+    user: Mapped["User"] = relationship()
 
 
 class PlayerMovieExhaustion(db.Model):
@@ -589,7 +641,7 @@ class BunkerFarmingSystem(db.Model):
 
 
 class BunkerTheatreSystem(db.Model):
-    """Community theatre; actors on :attr:`profession_line`. Phases advance on tick time."""
+    """Community theater; actors on :attr:`profession_line`. Phases advance on tick time."""
 
     __tablename__ = "bunker_theatre_systems"
 
@@ -708,6 +760,8 @@ class SystemMessage(db.Model):
         DateTime(timezone=True), default=_utcnow, nullable=False, index=True
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    #: ``bulletin`` = bunker-wide Silo Bulletin; ``group_chat`` = Inner Circle log only.
+    channel: Mapped[str] = mapped_column(String(32), nullable=False, default="bulletin")
 
     user: Mapped[User] = relationship(back_populates="system_messages")
 

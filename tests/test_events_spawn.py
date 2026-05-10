@@ -1,4 +1,4 @@
-"""Spawn-path behaviour for random events (mocked DB + RNG)."""
+"""Spawn-path behavior for random events (mocked DB + RNG)."""
 
 from __future__ import annotations
 
@@ -75,11 +75,17 @@ def test_try_spawn_event_intro_first_visit_when_eligible_and_roll_succeeds():
 
     msgs = [o for o in captured if isinstance(o, SystemMessage)]
     announce = spec.spawn_announcement(uid, tick)
+    gc_body = (
+        spec.spawn_group_chat_announcement(uid, tick)
+        if spec.spawn_group_chat_announcement is not None
+        else None
+    )
+    assert len(msgs) == (1 if announce else 0) + (1 if gc_body else 0)
+    by_ch = {m.channel: m for m in msgs}
     if announce:
-        assert len(msgs) == 1
-        assert msgs[0].body == announce
-    else:
-        assert len(msgs) == 0
+        assert by_ch[constants.MESSAGE_CHANNEL_BULLETIN].body == announce
+    if gc_body:
+        assert by_ch[constants.MESSAGE_CHANNEL_GROUP_CHAT].body == gc_body
 
 
 def test_try_spawn_event_spike_after_intro_when_eligible():

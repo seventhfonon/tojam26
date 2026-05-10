@@ -24,6 +24,8 @@ from . import constants as game_constants
 from .constants import (
     GAME_SYSTEM_LABELS,
     INVESTIGATION_DISPATCH_BY_SYSTEM,
+    MESSAGE_CHANNEL_BULLETIN,
+    MESSAGE_CHANNEL_GROUP_CHAT,
     normalize_game_system_id,
 )
 from .models import (
@@ -37,6 +39,25 @@ from .models import (
 from .professions import PROFESSION_IDLE, PROFESSION_INVESTIGATION
 
 log = logging.getLogger(__name__)
+
+
+def _post_player_message(
+    user_id: str,
+    body: str | None,
+    tick_time: datetime,
+    *,
+    channel: str = MESSAGE_CHANNEL_BULLETIN,
+) -> None:
+    if body is None or not str(body).strip():
+        return
+    db.session.add(
+        SystemMessage(
+            user_id=user_id,
+            body=str(body),
+            timestamp=tick_time,
+            channel=channel,
+        )
+    )
 
 
 class EventDefinition(StrEnum):
@@ -73,6 +94,8 @@ class EventOutcome:
 
     loyalty_delta: float
     message: str
+    #: Optional Inner Circle–flavored line (Group Chat); ``None`` skips posting.
+    group_chat_message: str | None = None
 
 
 @dataclass(frozen=True)
@@ -80,7 +103,7 @@ class EventTickEffects:
     """Per-tick simulation adjustments while this event row is active.
 
     Add fields here as new systems read modifiers from ``game_tick`` (defaults keep
-    legacy behaviour when unchanged).
+    legacy behavior when unchanged).
     """
 
     #: Multiplier on baseline population food consumption (per capita × population).
@@ -106,7 +129,7 @@ class GameEventSpec:
     auto_resolve: Callable[[str, datetime], EventOutcome]
     #: Investigation sweep completes with subsystem match — player-resolution path.
     player_resolve: Callable[[str, datetime], EventOutcome]
-    #: Optional system message when the event row is created; ``None`` skips posting.
+    #: Optional ``SystemMessage`` body for Silo Bulletin when the row is created; ``None`` skips posting.
     spawn_announcement: Callable[[str, datetime], str | None]
     #: Runs immediately after the ``PlayerActiveEvent`` row is added (same transaction); DB/session side effects only.
     on_spawn: Callable[[str, datetime], None]
@@ -114,6 +137,8 @@ class GameEventSpec:
     system: str | None = None
     #: Optional side effects after ``player_resolve`` (same transaction as messages).
     on_player_resolve: Callable[[str, datetime], None] | None = None
+    #: Optional Inner Circle Group Chat line when the row is created (spawn path); ``None`` skips posting.
+    spawn_group_chat_announcement: Callable[[str, datetime], str | None] | None = None
 
 
 def rats_spike_marginal_food_consumption_per_second(population: int) -> float:
@@ -181,6 +206,9 @@ def _rats_silo_intro_auto_resolve(_user_id: str, _tick_time: datetime) -> EventO
             "The intrusion settled into a chronic nuisance: small gnaw-holes "
             "and scattered husks, but bulk stores appear intact for now."
         ),
+        group_chat_message=(
+            "Marnie: Chronic nuisance beats a panic — still, lock rotation on the grain bays."
+        ),
     )
 
 
@@ -190,6 +218,9 @@ def _rats_silo_intro_player_resolve(_user_id: str, _tick_time: datetime) -> Even
         message=(
             "Containment sealed the breach path and laid deterrent lines; "
             "morale improved once crews proved the bulk grain stayed accounted."
+        ),
+        group_chat_message=(
+            "Tamsin: That sweep reads honest — crews counted sacks before we spun the story."
         ),
     )
 
@@ -204,6 +235,12 @@ def _rats_silo_intro_spawn_announce(_user_id: str, _tick_time: datetime) -> str 
     return (
         "!RATS! Grain-room telemetry flagged vibration behind the inner jacket — "
         "rats have breached the silo liner. We may be able to salvage something by investigating food storage."
+    )
+
+
+def _rats_silo_intro_spawn_group_chat(_user_id: str, _tick_time: datetime) -> str | None:
+    return (
+        "Vesper (quiet): Grain telemetry isn't lying — we need eyes in food storage before rumor does it for us."
     )
 
 
@@ -226,6 +263,9 @@ def _rats_silo_spike_auto_resolve(_user_id: str, _tick_time: datetime) -> EventO
             "The rat swarm dispersed after exhausting scattered grain. "
             "Residents are unhappy about the wasted supplies."
         ),
+        group_chat_message=(
+            "Nadia: Swarm ate our slack — next time we don't wait on paperwork to kill lights near spillage."
+        ),
     )
 
 
@@ -236,11 +276,20 @@ def _rats_silo_spike_player_resolve(_user_id: str, _tick_time: datetime) -> Even
             "Investigation team cleared the silo breach and salvaged "
             "most of the spillage. Morale improved."
         ),
+        group_chat_message=(
+            "Jace: Salvage numbers match the manifest — that's the kind of proof people remember."
+        ),
     )
 
 
 def _rats_silo_spike_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
     return None
+
+
+def _rats_silo_spike_spawn_group_chat(_user_id: str, _tick_time: datetime) -> str | None:
+    return (
+        "Vesper: Spike signature on IR — that's not background noise, that's a corridor moving."
+    )
 
 
 def _rats_silo_intro_tick_effects(_user_id: str, _tick_time: datetime) -> EventTickEffects:
@@ -265,6 +314,9 @@ def _fireside_backlash_auto_resolve(_user_id: str, _tick_time: datetime) -> Even
         message=(
             "Whispers about your last broadcast fade into the usual bunker noise."
         ),
+        group_chat_message=(
+            "Marnie: Heat's off the transcript — keep the next briefing boring on purpose."
+        ),
     )
 
 
@@ -273,7 +325,16 @@ def _fireside_backlash_player_resolve(_user_id: str, _tick_time: datetime) -> Ev
 
 
 def _fireside_backlash_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
-    return None
+    return (
+        "!!Word spreads fast: residents circulate rough transcripts and "
+        "spot holes in your speech."
+    )
+
+
+def _fireside_backlash_spawn_group_chat(_user_id: str, _tick_time: datetime) -> str | None:
+    return (
+        "Tamsin: They're quoting you line-by-line in Corridor C — tighten the narrative or we lose them."
+    )
 
 
 def _fireside_backlash_on_spawn(user_id: str, tick_time: datetime) -> None:
@@ -310,6 +371,9 @@ def _geiger_exodus_auto_resolve(user_id: str, _tick_time: datetime) -> EventOutc
         message=(
             "The scramble toward the hatch loses steam — whoever could bolt already did."
         ),
+        group_chat_message=(
+            "Nadia: Exodus chatter peaked — those still here want a face-saving story tonight."
+        ),
     )
 
 
@@ -338,6 +402,7 @@ REGISTERED_EVENTS: tuple[GameEventSpec, ...] = (
         on_spawn=_rats_silo_intro_on_spawn,
         system="farming",
         on_player_resolve=_rats_silo_intro_after_player_resolve,
+        spawn_group_chat_announcement=_rats_silo_intro_spawn_group_chat,
     ),
     GameEventSpec(
         definition=EventDefinition.RATS_SILO,
@@ -350,6 +415,7 @@ REGISTERED_EVENTS: tuple[GameEventSpec, ...] = (
         spawn_announcement=_rats_silo_spike_spawn_announce,
         on_spawn=_noop_on_spawn,
         system="farming",
+        spawn_group_chat_announcement=_rats_silo_spike_spawn_group_chat,
     ),
     GameEventSpec(
         definition=EventDefinition.FIRESIDE_RHETORIC_BACKLASH,
@@ -362,6 +428,7 @@ REGISTERED_EVENTS: tuple[GameEventSpec, ...] = (
         spawn_announcement=_fireside_backlash_spawn_announce,
         on_spawn=_fireside_backlash_on_spawn,
         system=None,
+        spawn_group_chat_announcement=_fireside_backlash_spawn_group_chat,
     ),
     GameEventSpec(
         definition=EventDefinition.GEIGER_RUMOR_EXODUS,
@@ -401,16 +468,11 @@ def enqueue_fireside_rhetoric_backlash(user_id: str, when: datetime) -> None:
         )
     )
     spec.on_spawn(user_id, when)
-    db.session.add(
-        SystemMessage(
-            user_id=user_id,
-            body=(
-                "!!Word spreads fast: residents circulate rough transcripts and "
-                "spot holes in your speech."
-            ),
-            timestamp=when,
-        )
-    )
+    announce_body = spec.spawn_announcement(user_id, when)
+    _post_player_message(user_id, announce_body, when, channel=MESSAGE_CHANNEL_BULLETIN)
+    if spec.spawn_group_chat_announcement is not None:
+        gc_body = spec.spawn_group_chat_announcement(user_id, when)
+        _post_player_message(user_id, gc_body, when, channel=MESSAGE_CHANNEL_GROUP_CHAT)
     log.info("fireside rhetoric backlash enqueued: user=%s until=%s", user_id, deadline)
 
 
@@ -448,15 +510,23 @@ def enqueue_geiger_rumor_exodus(user_id: str, when: datetime, population_count: 
             system=None,
         )
     )
-    db.session.add(
-        SystemMessage(
-            user_id=user_id,
-            body=(
-                "!!Rumors spread that Geiger readings outside are lower than what you've reported. "
-                "People quietly kit up to chance it on their own; others linger, waiting on word from you."
-            ),
-            timestamp=when,
-        )
+    _post_player_message(
+        user_id,
+        (
+            "!!Rumors spread that Geiger readings outside are lower than what you've reported. "
+            "People quietly kit up to chance it on their own; others linger, waiting on word from you."
+        ),
+        when,
+        channel=MESSAGE_CHANNEL_BULLETIN,
+    )
+    _post_player_message(
+        user_id,
+        (
+            "Marnie: Quiet kits by the hatch — they're comparing your numbers to scout gossip. "
+            "We need alignment before this becomes a stampede."
+        ),
+        when,
+        channel=MESSAGE_CHANNEL_GROUP_CHAT,
     )
     log.info("geiger rumor exodus enqueued: user=%s quota=%s", user_id, quota)
 
@@ -667,12 +737,17 @@ def finalize_investigation_if_due(user_id: str, tick_time: datetime) -> float:
         if spec.on_player_resolve is not None:
             spec.on_player_resolve(user_id, tick_time)
         delta = float(outcome.loyalty_delta)
-        db.session.add(
-            SystemMessage(
-                user_id=user_id,
-                body=outcome.message,
-                timestamp=tick_time,
-            )
+        _post_player_message(
+            user_id,
+            outcome.message,
+            tick_time,
+            channel=MESSAGE_CHANNEL_BULLETIN,
+        )
+        _post_player_message(
+            user_id,
+            outcome.group_chat_message,
+            tick_time,
+            channel=MESSAGE_CHANNEL_GROUP_CHAT,
         )
         log.info(
             "investigation tied off subsystem event: user=%s definition=%s system=%s loyalty_delta=%s",
@@ -683,12 +758,11 @@ def finalize_investigation_if_due(user_id: str, tick_time: datetime) -> float:
         )
         return delta
 
-    db.session.add(
-        SystemMessage(
-            user_id=user_id,
-            body=ROUTINE_INVESTIGATION_COMPLETE_TEMPLATE.format(subsystem=subsystem_lbl),
-            timestamp=tick_time,
-        )
+    _post_player_message(
+        user_id,
+        ROUTINE_INVESTIGATION_COMPLETE_TEMPLATE.format(subsystem=subsystem_lbl),
+        tick_time,
+        channel=MESSAGE_CHANNEL_BULLETIN,
     )
     log.info(
         "routine investigation sweep finished: user=%s target_system=%s",
@@ -733,12 +807,17 @@ def auto_resolve_if_due(user_id: str, tick_time: datetime) -> float:
         outcome = spec.auto_resolve(user_id, tick_time)
         delta = float(outcome.loyalty_delta)
         total_delta += delta
-        db.session.add(
-            SystemMessage(
-                user_id=user_id,
-                body=outcome.message,
-                timestamp=tick_time,
-            )
+        _post_player_message(
+            user_id,
+            outcome.message,
+            tick_time,
+            channel=MESSAGE_CHANNEL_BULLETIN,
+        )
+        _post_player_message(
+            user_id,
+            outcome.group_chat_message,
+            tick_time,
+            channel=MESSAGE_CHANNEL_GROUP_CHAT,
         )
         log.info(
             "event auto-resolved: user=%s definition=%s loyalty_delta=%s",
@@ -788,13 +867,13 @@ def try_spawn_event(
         )
         spec.on_spawn(user_id, tick_time)
         announce_body = spec.spawn_announcement(user_id, tick_time)
-        if announce_body:
-            db.session.add(
-                SystemMessage(
-                    user_id=user_id,
-                    body=announce_body,
-                    timestamp=tick_time,
-                )
+        _post_player_message(
+            user_id, announce_body, tick_time, channel=MESSAGE_CHANNEL_BULLETIN
+        )
+        if spec.spawn_group_chat_announcement is not None:
+            gc_body = spec.spawn_group_chat_announcement(user_id, tick_time)
+            _post_player_message(
+                user_id, gc_body, tick_time, channel=MESSAGE_CHANNEL_GROUP_CHAT
             )
         log.info(
             "event spawned: user=%s definition=%s duration_s=%s",
@@ -850,12 +929,11 @@ def try_dispatch_investigation(user_id: str, system: str, when: datetime) -> boo
             ev_row.auto_resolve_at = busy_until
 
     subsystem_lbl = GAME_SYSTEM_LABELS.get(system_id, system_id)
-    db.session.add(
-        SystemMessage(
-            user_id=user_id,
-            body=ROUTINE_INVESTIGATION_DISPATCH_TEMPLATE.format(n=team_n, subsystem=subsystem_lbl),
-            timestamp=when,
-        )
+    _post_player_message(
+        user_id,
+        ROUTINE_INVESTIGATION_DISPATCH_TEMPLATE.format(n=team_n, subsystem=subsystem_lbl),
+        when,
+        channel=MESSAGE_CHANNEL_BULLETIN,
     )
     log.info(
         "investigation sweep dispatched: user=%s system=%s team=%d until=%s",

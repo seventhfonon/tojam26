@@ -30,7 +30,7 @@ Grafana’s heatmap plugin is fed data in a shape it understands as **heatmap ro
 ## Reference image and noise (`app/environment_pixel_reference.py`)
 
 - Static PNG: **`app/static/environment_pixel_reference.png`**.
-- `environment_pixel_cells_from_reference_image(grid_cols, grid_rows)` downsamples **RGB → luminance** (simple sRGB-ish weights) onto the grid cell centres and returns a row-major **`list[list[float]]`** in **[0, 1]**, or **`None`** if the file is missing or Pillow is unavailable.
+- `environment_pixel_cells_from_reference_image(grid_cols, grid_rows)` downsamples **RGB → luminance** (simple sRGB-ish weights) onto the grid cell centers and returns a row-major **`list[list[float]]`** in **[0, 1]**, or **`None`** if the file is missing or Pillow is unavailable.
 - **`apply_uniform_tick_noise`** adds independent uniform noise in **`[-half_range, +half_range]`** per cell and clamps.
 
 If the reference cannot be loaded, `record_environment_pixel_noise_sample` falls back to **pure uniform random** noise for the frame.
@@ -79,7 +79,7 @@ ffmpeg -y -ss 02:48 -i /path/to/source.mp4 -vf "fps=1" -frames:v 20 \
 
 Requires **ffmpeg** on your PATH. Resolution and aspect of the source PNGs are arbitrary; they are resampled to **`ENVIRONMENT_PIXEL_GRID_COLS` × `ENVIRONMENT_PIXEL_GRID_ROWS`** for the heatmap.
 
-**Other clips:** the Social dashboard theatre heatmap uses separate subfolders under **`app/assets/images/`** (see **`MOVIE_PIXEL_ASSET_SUBDIR_BY_ID`** in **`app/movie_pixel_frames.py`**). Use the same **`frame_00.png` … `frame_{N−1}.png`** naming (**N** = **`SOCIAL_MOVIE_PIXEL_SEQUENCE_FRAME_COUNT`** in **`app/constants.py`**, currently **60**) and the same ffmpeg ideas as above; spacing in source video is a content choice per movie.
+**Other clips:** the Social dashboard theater heatmap uses separate subfolders under **`app/assets/images/`** (see **`MOVIE_PIXEL_ASSET_SUBDIR_BY_ID`** in **`app/movie_pixel_frames.py`**). Use the same **`frame_00.png` … `frame_{N−1}.png`** naming (**N** = **`SOCIAL_MOVIE_PIXEL_SEQUENCE_FRAME_COUNT`** in **`app/constants.py`**, currently **60**) and the same ffmpeg ideas as above; spacing in source video is a content choice per movie.
 
 ## Writing samples (`app/jobs.py`)
 

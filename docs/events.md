@@ -2,7 +2,7 @@
 
 Events are **defined in Python** in [`app/events.py`](../app/events.py). Runtime state is **zero or more concurrent rows** per player in `player_active_events` (`PlayerActiveEvent`), keyed by surrogate **`id`**. At most **one active row per `(user_id, kind)`** (unique constraint).
 
-Global simulation knobs (tick interval, baseline food rates, investigation team sizes, etc.) stay in [`app/constants.py`](../app/constants.py). Per-event tuning and behaviour live on each `GameEventSpec`.
+Global simulation knobs (tick interval, baseline food rates, investigation team sizes, etc.) stay in [`app/constants.py`](../app/constants.py). Per-event tuning and behavior live on each `GameEventSpec`.
 
 **Schema:** this repo assumes Postgres can be wiped between sessions (`create_all` on empty DB). The ORM defines `player_active_events` with UUID **`id`** as PK and **`UNIQUE (user_id, kind)`**.
 
