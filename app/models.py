@@ -9,10 +9,10 @@ them as a time series.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -48,6 +48,14 @@ class User(db.Model):
     rat_background_consumption_ps: Mapped[float] = mapped_column(
         Float, nullable=False, default=0.0
     )
+    #: Rat trapper hiring unlocked after ``rats_silo_intro`` clears via farming investigation.
+    rat_trappers_unlocked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Until this instant (exclusive), player-directed actions are blocked (sermon).
+    sermon_busy_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: When true, next tick after sermon ends applies completion bonuses once.
+    sermon_reward_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     radiation_samples: Mapped[list["RadiationLevel"]] = relationship(
         back_populates="user",
@@ -81,6 +89,11 @@ class User(db.Model):
         uselist=False,
     )
     bunker_farming: Mapped[Optional["BunkerFarmingSystem"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    bunker_theatre: Mapped[Optional["BunkerTheatreSystem"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
@@ -119,6 +132,18 @@ class User(db.Model):
         cascade="all, delete-orphan",
     )
     crop_plots: Mapped[list["BunkerCropPlot"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    environment_pixel_noise_samples: Mapped[list["EnvironmentPixelNoiseSample"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    social_movie_pixel_samples: Mapped[list["SocialMoviePixelSample"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    movie_exhaustion_rows: Mapped[list["PlayerMovieExhaustion"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
@@ -283,6 +308,14 @@ class BunkerSocialState(db.Model):
     last_show_movie_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    movie_screening_movie_id: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )
+    movie_screening_started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: PNG frame cursor for ``record_social_movie_pixel_sample`` while a screening is active.
+    movie_pixel_frame_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_give_speech_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -296,6 +329,35 @@ class BunkerSocialState(db.Model):
         return (
             f"<BunkerSocialState user={self.user_id} "
             f"inner_circle={self.inner_circle_loyalty}>"
+        )
+
+
+class PlayerMovieExhaustion(db.Model):
+    """Per-title screening fatigue; decays over time in ``game_tick``."""
+
+    __tablename__ = "player_movie_exhaustion"
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="uq_player_movie_exhaustion_user_movie"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    movie_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    exhaustion: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    screenings_completed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="movie_exhaustion_rows")
+
+    def __repr__(self) -> str:
+        return (
+            f"<PlayerMovieExhaustion user={self.user_id} movie={self.movie_id!r} "
+            f"ex={self.exhaustion:.1f}>"
         )
 
 
@@ -363,7 +425,7 @@ class BunkerProfession(db.Model):
     """Mutable headcount for one profession slot (one row per user per profession).
 
     Worker-assigned bunker systems reference the row for ``Power crank``,
-    ``Farming``, or ``Rat trapping`` (silo defense). ``Idle`` has no system row.
+    ``Farming``, ``Rat trapping``, or ``Theatre``. ``Idle`` has no system row.
     Tick snapshots copy these counts into :class:`BunkerProfessionSnapshot`.
     """
 
@@ -398,6 +460,10 @@ class BunkerProfession(db.Model):
     rat_trapping_slot: Mapped[Optional["BunkerFarmingSystem"]] = relationship(
         back_populates="rat_trapper_line",
         foreign_keys="[BunkerFarmingSystem.rat_trapper_line_id]",
+        uselist=False,
+    )
+    theatre_slot: Mapped[Optional["BunkerTheatreSystem"]] = relationship(
+        back_populates="profession_line",
         uselist=False,
     )
 
@@ -501,6 +567,46 @@ class BunkerFarmingSystem(db.Model):
         )
 
 
+class BunkerTheatreSystem(db.Model):
+    """Community theatre; actors on :attr:`profession_line`. Phases advance on tick time."""
+
+    __tablename__ = "bunker_theatre_systems"
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    profession_line_id: Mapped[int] = mapped_column(
+        ForeignKey("bunker_professions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    #: idle | writing | rehearsing | ready
+    phase: Mapped[str] = mapped_column(String(32), nullable=False, default="idle")
+    phase_entered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    next_performance_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="bunker_theatre")
+    profession_line: Mapped[BunkerProfession] = relationship(
+        back_populates="theatre_slot",
+        foreign_keys=[profession_line_id],
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<BunkerTheatreSystem user={self.user_id} phase={self.phase!r} "
+            f"next_show={self.next_performance_at}>"
+        )
+
+
 class BunkerCropPlot(db.Model):
     """One hydroponic plot; ``crop_ready_at`` set while crops mature."""
 
@@ -586,10 +692,73 @@ class SystemMessage(db.Model):
         return f"<SystemMessage user={self.user_id} t={self.timestamp} body={self.body!r}>"
 
 
+class EnvironmentPixelNoiseSample(db.Model):
+    """Environment dashboard heatmap: timestamped vertical strips per player.
+
+    Each game tick replaces all rows with synthetic history (see
+    ``record_environment_pixel_noise_sample``). The heatmap's horizontal axis is
+    **time**; each row stores one strip as ``cells``: ``list[float]`` length
+    ``grid_rows`` (values in ``[0, 1]``). ``grid_cols`` is ``1`` for this layout.
+    """
+
+    __tablename__ = "environment_pixel_noise_samples"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    grid_cols: Mapped[int] = mapped_column(Integer, nullable=False)
+    grid_rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    cells: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="environment_pixel_noise_samples")
+
+    def __repr__(self) -> str:
+        return (
+            f"<EnvironmentPixelNoiseSample user={self.user_id} t={self.timestamp} "
+            f"{self.grid_cols}x{self.grid_rows}>"
+        )
+
+
+class SocialMoviePixelSample(db.Model):
+    """Social dashboard movie-screen strips: one ``movie_id`` channel per player per tick."""
+
+    __tablename__ = "social_movie_pixel_samples"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
+    )
+    movie_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    grid_cols: Mapped[int] = mapped_column(Integer, nullable=False)
+    grid_rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    cells: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="social_movie_pixel_samples")
+
+    def __repr__(self) -> str:
+        return (
+            f"<SocialMoviePixelSample user={self.user_id} movie={self.movie_id!r} "
+            f"t={self.timestamp} {self.grid_cols}x{self.grid_rows}>"
+        )
+
+
 class PlayerActiveEvent(db.Model):
     """Concurrent random gameplay events per player (one row per active definition).
 
-    Rows are removed when the event auto-resolves or is cleared via investigation.
+    Rows are removed when the event auto-resolves (if timed) or is cleared via investigation.
     """
 
     __tablename__ = "player_active_events"
@@ -612,8 +781,9 @@ class PlayerActiveEvent(db.Model):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
-    auto_resolve_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+    #: ``None`` — auto-resolve disabled until cleared via investigation (when tied to ``system``).
+    auto_resolve_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
     )
     #: Optional subsystem this event belongs to; sweep dispatch can clear it when ids match.
     system: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -623,7 +793,7 @@ class PlayerActiveEvent(db.Model):
     def __repr__(self) -> str:
         return (
             f"<PlayerActiveEvent id={self.id!r} user={self.user_id} kind={self.kind!r} "
-            f"system={self.system!r} until={self.auto_resolve_at}>"
+            f"system={self.system!r} until={self.auto_resolve_at!r}>"
         )
 
 

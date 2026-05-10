@@ -46,6 +46,12 @@ game UI.
 - **APScheduler** runs in-process with Flask and ticks every
   `DECAY_TICK_SECONDS` (default 30s), appending one decayed sample per player.
 
+### Grafana UI conventions
+
+Unless otherwise requested, **start with stock Grafana building blocks**: provisioned datasources, standard panel types (time series, heatmap, stat, table, etc.), transformations, and dashboard refresh for anything the player sees on a dashboard. Prefer that over custom HTML or JavaScript inside Text panels or bespoke browser polling to Flask. Reach for Text/HTML or thin Flask endpoints consumed only from Grafana when a stock panel cannot represent the data after reasonable query shaping.
+
+On the **Environment** dashboard, the **sensor heatmap** panel uses its **own rolling SQL window** (hidden template variable `heatmap_history_seconds`, aligned with `ENVIRONMENT_PIXEL_BACKFILL_SPAN_SECONDS` in `app/constants.py`), so it stays populated even if the dashboard time range is zoomed or changed. The viz is a **48×48 pixel display** with **time on the horizontal axis**: each tick writes **48** timestamped vertical strips (see `ENVIRONMENT_PIXEL_TIME_COLUMNS` / `ENVIRONMENT_PIXEL_BACKFILL_SAMPLES` in `app/constants.py`).
+
 ## Running locally
 
 You need Docker Desktop (or any Docker engine with the Compose v2 plugin).
@@ -88,6 +94,8 @@ To tear it all down:
 docker compose down            # stops containers, keeps data
 docker compose down -v         # also wipes the Postgres + Grafana volumes
 ```
+
+**Database workflow:** Expect to **`docker compose down -v`** (wipe Postgres and Grafana data) between code changes that touch models or schema helpers. **Formal migrations are unnecessary** for this workflow: each fresh boot builds from `db.create_all()` plus the small `_ensure_*` guards in `create_app()`. Do not rely on carrying an old volume forward across refactors.
 
 ## Unit tests
 
@@ -160,17 +168,19 @@ The radiation model is the template. To add a new piece of player state:
 3. Add a panel to the appropriate dashboard under `grafana/dashboards/` that
    filters on `user_id = '$user_id'::uuid`. The `user_id` dashboard variable is
    already wired up and populated from the URL by Flask.
-4. For **existing** tables on developer machines that already have a Postgres
-   volume, additive columns may need a small `ALTER TABLE ... IF NOT EXISTS`
-   guard in `app/__init__.py` (same pattern as `level_display` and farming
-   columns) until Alembic is adopted—then restart `web` so that code runs.
+4. If you **keep** the same Postgres volume across pulls (unusual for this
+   repo—see **Database workflow** above), additive columns may still need a small
+   `ALTER TABLE ... IF NOT EXISTS` guard in `app/__init__.py`; restart `web`
+   afterward. With the default wipe-between-changes workflow, new tables and
+   columns come from `db.create_all()` alone.
 
 ## Notes / known caveats
 
 - `db.create_all()` plus a few explicit `_ensure_*` helpers in `create_app()`
-  bootstrap and patch the schema on **each `web` process start**. Restart or
-  recreate the `web` container after schema-related code changes. For
-  production, plan to swap in Alembic instead of ad-hoc ALTERs.
+  bootstrap and patch the schema on **each `web` process start**. After schema
+  edits, either wipe volumes (**Database workflow**) or restart `web` if you
+  are intentionally keeping data. For production, plan Alembic instead of ad-hoc
+  ALTERs.
 - The Grafana SQL queries interpolate `$user_id` directly. For a local,
   single-trusted-player game this is fine; before hosting publicly, switch to
   parameterized queries or have Flask expose a JSON API and use Grafana's

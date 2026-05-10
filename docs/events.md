@@ -14,14 +14,15 @@ Global simulation knobs (tick interval, baseline food rates, investigation team 
 |--------|------|------|
 | `definition` | `EventDefinition` | Which event this spec is; enum **values** are the wire ids persisted on `PlayerActiveEvent.kind`. |
 | `spawn_chance_per_tick` | `float` | Probability **per eligible tick** that this spec wins the spawn roll (see spawn loop below). |
-| `duration_seconds` | `int` | Active window; `auto_resolve_at = started_at + duration`. |
+| `duration_seconds` | `int \| None` | Active window in seconds, or **`None`** for no timer (`auto_resolve_at` stays null until investigation dispatch sets a floor). |
 | `tick_effects` | `(user_id, tick_time) → EventTickEffects` | Per-tick simulation modifiers while the row exists (extend `EventTickEffects` for new systems). |
 | `can_spawn` | `EventSpawnContext → bool` | Hard gate before RNG (food, population, flags, suppression rules, etc.). |
-| `auto_resolve` | `(user_id, tick_time) → EventOutcome` | Runs when `tick_time >= auto_resolve_at` and no investigation timer blocks resolution. |
+| `auto_resolve` | `(user_id, tick_time) → EventOutcome` | Runs when `tick_time >= auto_resolve_at` (row has a deadline) and no investigation timer blocks resolution. |
 | `player_resolve` | `(user_id, tick_time) → EventOutcome` | Runs when an investigation sweep **finishes** and its target subsystem **matches** `spec.system`. |
 | `spawn_announcement` | `(user_id, tick_time) → str \| None` | Optional `SystemMessage` body when the row is created; `None` skips posting. |
 | `on_spawn` | `(user_id, tick_time) → None` | Runs right after the active-event row is added (same transaction), before `spawn_announcement`; use for immediate DB/session mutations (e.g. flags on `User`). |
 | `system` | `str \| None` | Optional bunker subsystem id (e.g. `"farming"`); ties player-resolution to investigation target. |
+| `on_player_resolve` | `(user_id, tick_time) → None` \| omitted | Optional hook run immediately after **`player_resolve`** in **`finalize_investigation_if_due`** (same flush); use for unlock flags etc. |
 
 ---
 
@@ -81,10 +82,10 @@ Some helpers read a spec’s tick effects **without** an active DB row (e.g. mar
 
 ### Resolution
 
-- **`auto_resolve_if_due`**: while investigation is not blocking timers, finds **every** row with `auto_resolve_at <= tick_time`, deletes each, **`release_investigation_team_to_idle`** (idempotent), applies **`auto_resolve`** per row, posts messages, **sums** loyalty deltas.
-- **`finalize_investigation_if_due`**: when the sweep ends, if any active event’s **`system`** matches **`investigation_target_system`**, resolves **the oldest matching row** (`started_at` ascending) via **`player_resolve`** and deletes **only that row**; otherwise posts a routine “sweep complete” style message.
+- **`auto_resolve_if_due`**: while investigation is not blocking timers, finds **every** row with non-null `auto_resolve_at <= tick_time`, deletes each, **`release_investigation_team_to_idle`** (idempotent), applies **`auto_resolve`** per row, posts messages, **sums** loyalty deltas.
+- **`finalize_investigation_if_due`**: when the sweep ends, if any active event’s **`system`** matches **`investigation_target_system`**, resolves **the oldest matching row** (`started_at` ascending) via **`player_resolve`**, runs optional **`on_player_resolve`**, deletes **only that row**, then posts the outcome message; otherwise posts a routine “sweep complete” style message.
 
-Dispatching a subsystem investigation can **extend** `auto_resolve_at` on **every** active row whose deadline would fall before the sweep ends (`try_dispatch_investigation`).
+Dispatching a subsystem investigation sets or **extends** `auto_resolve_at` on **every** active row whose deadline is missing or would fall before the sweep ends (`try_dispatch_investigation`).
 
 ---
 
@@ -93,7 +94,7 @@ Dispatching a subsystem investigation can **extend** `auto_resolve_at` on **ever
 1. Add a **`EventDefinition`** member whose **value** is the wire id you will persist on `PlayerActiveEvent.kind`.
 2. Implement **`can_spawn`** using `EventSpawnContext` (add fields to the context and refresh logic in `event_spawn_context_from_user` / callers if needed).
 3. Implement **`tick_effects`**; extend **`EventTickEffects`** with new optional fields if something other than food must change per tick — **also extend merge logic** in `active_event_tick_effects`, then read that bundle from [`app/jobs.py`](../app/jobs.py) (or the relevant subsystem).
-4. Implement **`auto_resolve`**, **`player_resolve`**, **`on_spawn`** (use a no-op if nothing runs at spawn), and optionally **`spawn_announcement`**.
+4. Implement **`auto_resolve`**, **`player_resolve`**, **`on_spawn`** (use a no-op if nothing runs at spawn), optional **`on_player_resolve`** for investigation-completion side effects, and optionally **`spawn_announcement`**.
 5. Set **`system`** if resolution should tie to an investigation sweep on that subsystem (`GAME_SYSTEM_IDS` / labels live with constants).
 6. Append a **`GameEventSpec(...)`** to **`REGISTERED_EVENTS`**.
 7. Add tests under `tests/test_events_*.py` as appropriate.
@@ -106,4 +107,4 @@ Dispatching a subsystem investigation can **extend** `auto_resolve_at` on **ever
 |---------|--------|
 | Tick builds spawn inputs, applies merged tick effects, spawn/resolution | [`app/jobs.py`](../app/jobs.py) (`game_tick` and helpers) |
 | Investigation dispatch HTTP | [`app/routes.py`](../app/routes.py) |
-| Model | `PlayerActiveEvent`, `User.active_game_events` in [`app/models.py`](../app/models.py) |
+| Model | `PlayerActiveEvent`, `User.active_game_events`, `User.rat_trappers_unlocked` in [`app/models.py`](../app/models.py) |

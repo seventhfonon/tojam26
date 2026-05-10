@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 
-from app.constants import FARM_PLOT_COUNT
+from app.constants import ENVIRONMENT_PIXEL_BACKFILL_SAMPLES, FARM_PLOT_COUNT
 from app.extensions import db
 from app.jobs import game_tick
 from app.models import (
@@ -24,7 +24,9 @@ from app.models import (
     BunkerPowerCrankSystem,
     BunkerProfession,
     BunkerProfessionSnapshot,
+    BunkerTheatreSystem,
     EnergyReserve,
+    EnvironmentPixelNoiseSample,
     FoodReserve,
     RadiationLevel,
     User,
@@ -35,6 +37,7 @@ from app.professions import (
     PROFESSION_INVESTIGATION,
     PROFESSION_POWER_CRANK,
     PROFESSION_RAT_TRAPPING,
+    PROFESSION_THEATRE,
 )
 
 
@@ -119,7 +122,15 @@ def test_game_tick_commits_simulation_sample(app_ctx):
         count=0,
         updated_at=tick_origin,
     )
-    db.session.add_all([crank_line, farm_line, rat_line, idle_line, investigation_line])
+    theatre_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_THEATRE,
+        count=0,
+        updated_at=tick_origin,
+    )
+    db.session.add_all(
+        [crank_line, farm_line, rat_line, theatre_line, idle_line, investigation_line]
+    )
     db.session.flush()
     db.session.add(BunkerLightingSystem(user_id=uid, lights_on=True, updated_at=tick_origin))
     db.session.add(
@@ -134,6 +145,15 @@ def test_game_tick_commits_simulation_sample(app_ctx):
             user_id=uid,
             profession_line_id=farm_line.id,
             rat_trapper_line_id=rat_line.id,
+            updated_at=tick_origin,
+        )
+    )
+    db.session.add(
+        BunkerTheatreSystem(
+            user_id=uid,
+            profession_line_id=theatre_line.id,
+            phase="idle",
+            phase_entered_at=tick_origin,
             updated_at=tick_origin,
         )
     )
@@ -152,6 +172,15 @@ def test_game_tick_commits_simulation_sample(app_ctx):
     rad_after = db.session.query(RadiationLevel).filter_by(user_id=uid).count()
     assert rad_after > rad_before, "tick should append a new radiation sample"
 
+    pix_n = db.session.scalar(
+        select(func.count()).select_from(EnvironmentPixelNoiseSample).where(
+            EnvironmentPixelNoiseSample.user_id == uid
+        )
+    )
+    assert pix_n == ENVIRONMENT_PIXEL_BACKFILL_SAMPLES, (
+        "tick replaces raster with a full synthetic history per player"
+    )
+
     latest_ts = db.session.scalar(
         select(func.max(BunkerProfessionSnapshot.timestamp)).where(
             BunkerProfessionSnapshot.user_id == uid
@@ -164,7 +193,7 @@ def test_game_tick_commits_simulation_sample(app_ctx):
             BunkerProfessionSnapshot.timestamp == latest_ts,
         )
     ).all()
-    assert len(prof_rows) == 5
+    assert len(prof_rows) == 6
     by_prof = {r.profession: r.count for r in prof_rows}
     pop_after = db.session.scalar(
         select(BunkerPopulation.count)
@@ -174,6 +203,7 @@ def test_game_tick_commits_simulation_sample(app_ctx):
     )
     assert sum(by_prof.values()) == pop_after
     assert by_prof[PROFESSION_RAT_TRAPPING] == 0
+    assert by_prof[PROFESSION_THEATRE] == 0
     assert by_prof[PROFESSION_FARMING] == 3
     assert by_prof[PROFESSION_POWER_CRANK] == 0
     assert by_prof[PROFESSION_INVESTIGATION] == 0

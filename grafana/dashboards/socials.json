@@ -13,7 +13,7 @@
     "from": "now-15m",
     "to": "now"
   },
-  "refresh": "2s",
+  "refresh": "1s",
   "timepicker": {
     "refresh_intervals": [
       "1s",
@@ -38,6 +38,26 @@
         "options": [],
         "hide": 2,
         "skipUrlSync": false
+      },
+      {
+        "name": "social_movie_heatmap_history_seconds",
+        "type": "constant",
+        "label": "Social movie heatmap history window (seconds)",
+        "query": "900",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "900",
+          "value": "900"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "900",
+            "value": "900"
+          }
+        ],
+        "skipUrlSync": true
       }
     ]
   },
@@ -55,13 +75,13 @@
       },
       "options": {
         "mode": "html",
-        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u2622&nbsp; Environment&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming&nbsp;\u2197</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\ud83d\udc65&nbsp; Social</span></div>"
+        "content": "<style id=\"silo-social-movie-heatmap-hide-axis-labels\">\n[data-panelid=\"47\"] .u-axis text,\n[data-panelid=\"47\"] .u-axis .u-value,\n[data-panel-id=\"47\"] .u-axis text,\n[data-panel-id=\"47\"] .u-axis .u-value {\n  display: none !important;\n}\n</style>\n<script>\n(function siloSquareHeatmapPanel47() {\n  function findPanels() {\n    var roots = [];\n    ['[data-panelid=\"47\"]', '[data-panel-id=\"47\"]'].forEach(function(sel) {\n      document.querySelectorAll(sel).forEach(function(el) {\n        if (roots.indexOf(el) === -1) roots.push(el);\n      });\n    });\n    if (!roots.length) {\n      document.querySelectorAll('section[aria-label*=\"Movie screen\"]').forEach(function(el) {\n        roots.push(el);\n      });\n    }\n    return roots;\n  }\n\n  function tick() {\n    findPanels().forEach(function(root) {\n      var uplot = root.querySelector('.uplot');\n      if (!uplot) return;\n\n      var inner = root.querySelector('[data-testid*=\"panel-content\"]')\n        || root.querySelector('[data-testid*=\"Panel content\"]')\n        || root.querySelector('[class*=\"panel-content\"]')\n        || root;\n\n      var box = inner.getBoundingClientRect();\n      var rawW = Math.max(box.width - 28, 80);\n      var rawH = Math.max(box.height - 28, 80);\n      var S = Math.floor(Math.min(rawW, rawH));\n      if (S < 80) return;\n\n      var sx = S / rawW;\n      var sy = S / rawH;\n\n      var clip = uplot.closest('[data-testid*=\"viz-layout\"]') || uplot.parentElement;\n      if (!clip) return;\n\n      clip.style.setProperty('overflow', 'hidden', 'important');\n      clip.style.setProperty('width', S + 'px', 'important');\n      clip.style.setProperty('height', S + 'px', 'important');\n      clip.style.setProperty('margin-left', 'auto', 'important');\n      clip.style.setProperty('margin-right', 'auto', 'important');\n      clip.style.setProperty('box-sizing', 'border-box', 'important');\n\n      uplot.style.transformOrigin = 'top left';\n      uplot.style.setProperty('transform', 'scale(' + sx + ',' + sy + ')', 'important');\n    });\n    requestAnimationFrame(tick);\n  }\n\n  requestAnimationFrame(tick);\n})();\n</script>\n<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">☢&nbsp; Environment&nbsp;↗</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">⚡&nbsp; Power Systems&nbsp;↗</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">🌾&nbsp; Farming&nbsp;↗</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">👥&nbsp; Social</span></div>"
       }
     },
     {
       "id": 8,
       "type": "text",
-      "title": "\ud83d\udce1 System Messages",
+      "title": "📡 System Messages",
       "datasource": null,
       "gridPos": {
         "x": 0,
@@ -75,19 +95,1603 @@
       }
     },
     {
+      "id": 47,
+      "type": "heatmap",
+      "title": "Movie screen",
+      "description": "Single Postgres channel per player: **idle** rows use ``SOCIAL_MOVIE_PIXEL_IDLE_HEATMAP_MOVIE_ID`` (noise); **screening** rows use that title's ``movie_id`` (PNG sequence, ``movie_pixel_frame_index`` on ``bunker_social_state``). Grafana COALESCE picks which key to read. Greys scheme in panel options. Hidden ``social_movie_heatmap_history_seconds`` (900).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 6,
+        "h": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "cellValues": {},
+        "color": {
+          "mode": "scheme",
+          "scheme": "Greys",
+          "fill": "dark-orange",
+          "reverse": false,
+          "exponent": 1,
+          "scale": "linear",
+          "steps": 64,
+          "min": 0,
+          "max": 1
+        },
+        "exemplars": {
+          "color": "rgba(200,200,200,0.5)"
+        },
+        "legend": {
+          "show": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": true,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisPlacement": "hidden",
+          "reverse": true,
+          "decimals": 0
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH in_range AS (\n  SELECT timestamp, cells::jsonb AS ja\n  FROM social_movie_pixel_samples\n  WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid\n    AND movie_id = COALESCE(\n      (SELECT movie_screening_movie_id FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1),\n      '__idle_noise__'\n    )\n    AND timestamp <= NOW()\n    AND timestamp >= NOW() - (($social_movie_heatmap_history_seconds)::double precision * INTERVAL '1 second')\n),\nstrip AS (\n  SELECT ir.timestamp,\n         (r.ord - 1)::int AS row_idx,\n         (r.cell_val #>> '{}')::double precision AS val\n  FROM in_range ir\n  CROSS JOIN LATERAL jsonb_array_elements(ir.ja) WITH ORDINALITY AS r(cell_val, ord)\n)\nSELECT\n  timestamp AS time,\n         MAX(val) FILTER (WHERE row_idx = 0) AS \"0\",\n         MAX(val) FILTER (WHERE row_idx = 1) AS \"1\",\n         MAX(val) FILTER (WHERE row_idx = 2) AS \"2\",\n         MAX(val) FILTER (WHERE row_idx = 3) AS \"3\",\n         MAX(val) FILTER (WHERE row_idx = 4) AS \"4\",\n         MAX(val) FILTER (WHERE row_idx = 5) AS \"5\",\n         MAX(val) FILTER (WHERE row_idx = 6) AS \"6\",\n         MAX(val) FILTER (WHERE row_idx = 7) AS \"7\",\n         MAX(val) FILTER (WHERE row_idx = 8) AS \"8\",\n         MAX(val) FILTER (WHERE row_idx = 9) AS \"9\",\n         MAX(val) FILTER (WHERE row_idx = 10) AS \"10\",\n         MAX(val) FILTER (WHERE row_idx = 11) AS \"11\",\n         MAX(val) FILTER (WHERE row_idx = 12) AS \"12\",\n         MAX(val) FILTER (WHERE row_idx = 13) AS \"13\",\n         MAX(val) FILTER (WHERE row_idx = 14) AS \"14\",\n         MAX(val) FILTER (WHERE row_idx = 15) AS \"15\",\n         MAX(val) FILTER (WHERE row_idx = 16) AS \"16\",\n         MAX(val) FILTER (WHERE row_idx = 17) AS \"17\",\n         MAX(val) FILTER (WHERE row_idx = 18) AS \"18\",\n         MAX(val) FILTER (WHERE row_idx = 19) AS \"19\",\n         MAX(val) FILTER (WHERE row_idx = 20) AS \"20\",\n         MAX(val) FILTER (WHERE row_idx = 21) AS \"21\",\n         MAX(val) FILTER (WHERE row_idx = 22) AS \"22\",\n         MAX(val) FILTER (WHERE row_idx = 23) AS \"23\",\n         MAX(val) FILTER (WHERE row_idx = 24) AS \"24\",\n         MAX(val) FILTER (WHERE row_idx = 25) AS \"25\",\n         MAX(val) FILTER (WHERE row_idx = 26) AS \"26\",\n         MAX(val) FILTER (WHERE row_idx = 27) AS \"27\",\n         MAX(val) FILTER (WHERE row_idx = 28) AS \"28\",\n         MAX(val) FILTER (WHERE row_idx = 29) AS \"29\",\n         MAX(val) FILTER (WHERE row_idx = 30) AS \"30\",\n         MAX(val) FILTER (WHERE row_idx = 31) AS \"31\",\n         MAX(val) FILTER (WHERE row_idx = 32) AS \"32\",\n         MAX(val) FILTER (WHERE row_idx = 33) AS \"33\",\n         MAX(val) FILTER (WHERE row_idx = 34) AS \"34\",\n         MAX(val) FILTER (WHERE row_idx = 35) AS \"35\",\n         MAX(val) FILTER (WHERE row_idx = 36) AS \"36\",\n         MAX(val) FILTER (WHERE row_idx = 37) AS \"37\",\n         MAX(val) FILTER (WHERE row_idx = 38) AS \"38\",\n         MAX(val) FILTER (WHERE row_idx = 39) AS \"39\",\n         MAX(val) FILTER (WHERE row_idx = 40) AS \"40\",\n         MAX(val) FILTER (WHERE row_idx = 41) AS \"41\",\n         MAX(val) FILTER (WHERE row_idx = 42) AS \"42\",\n         MAX(val) FILTER (WHERE row_idx = 43) AS \"43\",\n         MAX(val) FILTER (WHERE row_idx = 44) AS \"44\",\n         MAX(val) FILTER (WHERE row_idx = 45) AS \"45\",\n         MAX(val) FILTER (WHERE row_idx = 46) AS \"46\",\n         MAX(val) FILTER (WHERE row_idx = 47) AS \"47\"\nFROM strip\nGROUP BY timestamp\nORDER BY timestamp"
+        }
+      ],
+      "timeFrom": "15m",
+      "timeTo": null,
+      "timeShift": null
+    },
+    {
+      "id": 50,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 6,
+        "y": 8,
+        "w": 3,
+        "h": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--purple{background:#8957e5}\n.movie-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.movie-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n</style>\n<script>\n(function(){\nvar MID=\"atomic_cafe\";\nvar bid=\"_silo_mv_btn_atomic_cafe\";\nvar fid=\"_silo_mv_frame_atomic_cafe\";\nfunction syncMv(){\nvar uidEnc=encodeURIComponent('${user_id}');\nfetch('http://localhost:5001/socials/movie-status?user_id='+uidEnc).then(function(r){return r.json();}).then(function(d){\nvar mv=(d.movies||[]).find(function(x){return x.id===MID;});\nvar btn=document.getElementById(bid);\nif(!btn)return;\nif(!mv){btn.disabled=true;btn.textContent='Screen';return;}\nbtn.disabled=!mv.can_play;\nbtn.textContent='Screen \\u2014 '+mv.energy_cost+' energy';\n}).catch(function(){var b=document.getElementById(bid);if(b){b.disabled=true;b.textContent='Screen';}});\n}\nwindow.silo_mv_go_atomic_cafe=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){syncMv();},600);\n};\nsyncMv();setInterval(syncMv,2000);\n})();\n</script>\n<div class=\"movie-wrap\">\n  <div class=\"movie-cell-head\">The Atomic Cafe</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--purple\" id=\"_silo_mv_btn_atomic_cafe\" disabled onclick='window.silo_mv_go_atomic_cafe(this, \"http://localhost:5001/action/show-movie?user_id=${user_id}&movie_id=atomic_cafe\")'>Screen</button>\n</div>"
+      }
+    },
+    {
+      "type": "bargauge",
+      "description": "Screening progress (percent full when complete). MOVIE_SCREENING_DURATION_SECONDS in app/constants.py (60s).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-purple",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 51,
+      "title": "Screening progress",
+      "gridPos": {
+        "x": 9,
+        "y": 8,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN (SELECT movie_screening_movie_id FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) = 'atomic_cafe'\n         AND (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) IS NOT NULL\n    THEN LEAST(100::double precision,\n      GREATEST(0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (\n          NOW() - (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1)\n        )) / 60.0))\n    ELSE 0::double precision\n  END AS screening_progress\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "description": "Fatigue for this title after a screening completes (+MOVIE_EXHAUSTION_GAIN_PER_PLAY per completion, same for all movies); decays per MOVIE_EXHAUSTION_DECAY_PER_SECOND.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-orange",
+                "value": 40
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 70
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 52,
+      "title": "Exhaustion",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, COALESCE(\n    (SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'atomic_cafe'),\n    0::double precision\n  )) AS exhaustion\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 15
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 53,
+      "title": "Boredom Reduction",
+      "description": "Next screening boredom relief: boredom_relief_base from MOVIES, scaled by screenings_completed and exhaustion (same formula as game_tick).",
+      "gridPos": {
+        "x": 15,
+        "y": 8,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (11.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'atomic_cafe'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'atomic_cafe'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-blue",
+                "value": 8
+              },
+              {
+                "color": "blue",
+                "value": 22
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 54,
+      "title": "Doubt Reduction",
+      "description": "Next screening doubt relief: doubt_relief_base from MOVIES in app/constants.py, with SOCIAL_MOVIE_DIMINISH_K and exhaustion scaling (matches completion tick).",
+      "gridPos": {
+        "x": 18,
+        "y": 8,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (38.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'atomic_cafe'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'atomic_cafe'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1e-06
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 55,
+      "title": "Loyalty Reduction",
+      "description": "Share of movie-exhaustion loyalty drain when combined exhaustion ≥ 50. MOVIE_EXHAUSTION_LOYALTY_DRAIN_PER_SECOND_AT_FULL=0.06/s.",
+      "gridPos": {
+        "x": 21,
+        "y": 8,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision) < 50::double precision\n    THEN 0::double precision\n    ELSE\n      (\n        (LEAST(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 100::double precision) - 50::double precision)\n        / 50.0 * 0.06::double precision\n      )\n      * (\n          COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'atomic_cafe'), 0::double precision)\n          / NULLIF(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 0::double precision)\n        )\n  END AS loyalty_reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 6,
+        "y": 11,
+        "w": 3,
+        "h": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--purple{background:#8957e5}\n.movie-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.movie-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n</style>\n<script>\n(function(){\nvar MID=\"the_day_after\";\nvar bid=\"_silo_mv_btn_the_day_after\";\nvar fid=\"_silo_mv_frame_the_day_after\";\nfunction syncMv(){\nvar uidEnc=encodeURIComponent('${user_id}');\nfetch('http://localhost:5001/socials/movie-status?user_id='+uidEnc).then(function(r){return r.json();}).then(function(d){\nvar mv=(d.movies||[]).find(function(x){return x.id===MID;});\nvar btn=document.getElementById(bid);\nif(!btn)return;\nif(!mv){btn.disabled=true;btn.textContent='Screen';return;}\nbtn.disabled=!mv.can_play;\nbtn.textContent='Screen \\u2014 '+mv.energy_cost+' energy';\n}).catch(function(){var b=document.getElementById(bid);if(b){b.disabled=true;b.textContent='Screen';}});\n}\nwindow.silo_mv_go_the_day_after=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){syncMv();},600);\n};\nsyncMv();setInterval(syncMv,2000);\n})();\n</script>\n<div class=\"movie-wrap\">\n  <div class=\"movie-cell-head\">The Day After</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--purple\" id=\"_silo_mv_btn_the_day_after\" disabled onclick='window.silo_mv_go_the_day_after(this, \"http://localhost:5001/action/show-movie?user_id=${user_id}&movie_id=the_day_after\")'>Screen</button>\n</div>"
+      }
+    },
+    {
+      "type": "bargauge",
+      "description": "Screening progress (percent full when complete). MOVIE_SCREENING_DURATION_SECONDS in app/constants.py (60s).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-purple",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 57,
+      "title": "Screening progress",
+      "gridPos": {
+        "x": 9,
+        "y": 11,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN (SELECT movie_screening_movie_id FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) = 'the_day_after'\n         AND (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) IS NOT NULL\n    THEN LEAST(100::double precision,\n      GREATEST(0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (\n          NOW() - (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1)\n        )) / 60.0))\n    ELSE 0::double precision\n  END AS screening_progress\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "description": "Fatigue for this title after a screening completes (+MOVIE_EXHAUSTION_GAIN_PER_PLAY per completion, same for all movies); decays per MOVIE_EXHAUSTION_DECAY_PER_SECOND.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-orange",
+                "value": 40
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 70
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 58,
+      "title": "Exhaustion",
+      "gridPos": {
+        "x": 12,
+        "y": 11,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, COALESCE(\n    (SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'the_day_after'),\n    0::double precision\n  )) AS exhaustion\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 15
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 59,
+      "title": "Boredom Reduction",
+      "description": "Next screening boredom relief: boredom_relief_base from MOVIES, scaled by screenings_completed and exhaustion (same formula as game_tick).",
+      "gridPos": {
+        "x": 15,
+        "y": 11,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (21.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'the_day_after'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'the_day_after'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-blue",
+                "value": 8
+              },
+              {
+                "color": "blue",
+                "value": 22
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 60,
+      "title": "Doubt Reduction",
+      "description": "Next screening doubt relief: doubt_relief_base from MOVIES in app/constants.py, with SOCIAL_MOVIE_DIMINISH_K and exhaustion scaling (matches completion tick).",
+      "gridPos": {
+        "x": 18,
+        "y": 11,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (30.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'the_day_after'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'the_day_after'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1e-06
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 61,
+      "title": "Loyalty Reduction",
+      "description": "Share of movie-exhaustion loyalty drain when combined exhaustion ≥ 50. MOVIE_EXHAUSTION_LOYALTY_DRAIN_PER_SECOND_AT_FULL=0.06/s.",
+      "gridPos": {
+        "x": 21,
+        "y": 11,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision) < 50::double precision\n    THEN 0::double precision\n    ELSE\n      (\n        (LEAST(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 100::double precision) - 50::double precision)\n        / 50.0 * 0.06::double precision\n      )\n      * (\n          COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'the_day_after'), 0::double precision)\n          / NULLIF(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 0::double precision)\n        )\n  END AS loyalty_reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 6,
+        "y": 14,
+        "w": 3,
+        "h": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--purple{background:#8957e5}\n.movie-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.movie-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n</style>\n<script>\n(function(){\nvar MID=\"mad_max\";\nvar bid=\"_silo_mv_btn_mad_max\";\nvar fid=\"_silo_mv_frame_mad_max\";\nfunction syncMv(){\nvar uidEnc=encodeURIComponent('${user_id}');\nfetch('http://localhost:5001/socials/movie-status?user_id='+uidEnc).then(function(r){return r.json();}).then(function(d){\nvar mv=(d.movies||[]).find(function(x){return x.id===MID;});\nvar btn=document.getElementById(bid);\nif(!btn)return;\nif(!mv){btn.disabled=true;btn.textContent='Screen';return;}\nbtn.disabled=!mv.can_play;\nbtn.textContent='Screen \\u2014 '+mv.energy_cost+' energy';\n}).catch(function(){var b=document.getElementById(bid);if(b){b.disabled=true;b.textContent='Screen';}});\n}\nwindow.silo_mv_go_mad_max=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){syncMv();},600);\n};\nsyncMv();setInterval(syncMv,2000);\n})();\n</script>\n<div class=\"movie-wrap\">\n  <div class=\"movie-cell-head\">Mad Max</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--purple\" id=\"_silo_mv_btn_mad_max\" disabled onclick='window.silo_mv_go_mad_max(this, \"http://localhost:5001/action/show-movie?user_id=${user_id}&movie_id=mad_max\")'>Screen</button>\n</div>"
+      }
+    },
+    {
+      "type": "bargauge",
+      "description": "Screening progress (percent full when complete). MOVIE_SCREENING_DURATION_SECONDS in app/constants.py (60s).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-purple",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 63,
+      "title": "Screening progress",
+      "gridPos": {
+        "x": 9,
+        "y": 14,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN (SELECT movie_screening_movie_id FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) = 'mad_max'\n         AND (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) IS NOT NULL\n    THEN LEAST(100::double precision,\n      GREATEST(0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (\n          NOW() - (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1)\n        )) / 60.0))\n    ELSE 0::double precision\n  END AS screening_progress\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "description": "Fatigue for this title after a screening completes (+MOVIE_EXHAUSTION_GAIN_PER_PLAY per completion, same for all movies); decays per MOVIE_EXHAUSTION_DECAY_PER_SECOND.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-orange",
+                "value": 40
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 70
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 64,
+      "title": "Exhaustion",
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, COALESCE(\n    (SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'mad_max'),\n    0::double precision\n  )) AS exhaustion\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 15
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 65,
+      "title": "Boredom Reduction",
+      "description": "Next screening boredom relief: boredom_relief_base from MOVIES, scaled by screenings_completed and exhaustion (same formula as game_tick).",
+      "gridPos": {
+        "x": 15,
+        "y": 14,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (32.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'mad_max'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'mad_max'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-blue",
+                "value": 8
+              },
+              {
+                "color": "blue",
+                "value": 22
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 66,
+      "title": "Doubt Reduction",
+      "description": "Next screening doubt relief: doubt_relief_base from MOVIES in app/constants.py, with SOCIAL_MOVIE_DIMINISH_K and exhaustion scaling (matches completion tick).",
+      "gridPos": {
+        "x": 18,
+        "y": 14,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (17.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'mad_max'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'mad_max'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1e-06
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 67,
+      "title": "Loyalty Reduction",
+      "description": "Share of movie-exhaustion loyalty drain when combined exhaustion ≥ 50. MOVIE_EXHAUSTION_LOYALTY_DRAIN_PER_SECOND_AT_FULL=0.06/s.",
+      "gridPos": {
+        "x": 21,
+        "y": 14,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision) < 50::double precision\n    THEN 0::double precision\n    ELSE\n      (\n        (LEAST(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 100::double precision) - 50::double precision)\n        / 50.0 * 0.06::double precision\n      )\n      * (\n          COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'mad_max'), 0::double precision)\n          / NULLIF(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 0::double precision)\n        )\n  END AS loyalty_reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 6,
+        "y": 17,
+        "w": 3,
+        "h": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.silo-btn{display:inline-block;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;width:100%;box-sizing:border-box;}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--purple{background:#8957e5}\n.movie-wrap{border:1px solid #30363d;border-radius:8px;padding:10px;text-align:center;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}\n.movie-cell-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px}\n</style>\n<script>\n(function(){\nvar MID=\"simpsons_s06e14_barts_comet\";\nvar bid=\"_silo_mv_btn_simpsons_s06e14_barts_comet\";\nvar fid=\"_silo_mv_frame_simpsons_s06e14_barts_comet\";\nfunction syncMv(){\nvar uidEnc=encodeURIComponent('${user_id}');\nfetch('http://localhost:5001/socials/movie-status?user_id='+uidEnc).then(function(r){return r.json();}).then(function(d){\nvar mv=(d.movies||[]).find(function(x){return x.id===MID;});\nvar btn=document.getElementById(bid);\nif(!btn)return;\nif(!mv){btn.disabled=true;btn.textContent='Screen';return;}\nbtn.disabled=!mv.can_play;\nbtn.textContent='Screen \\u2014 '+mv.energy_cost+' energy';\n}).catch(function(){var b=document.getElementById(bid);if(b){b.disabled=true;b.textContent='Screen';}});\n}\nwindow.silo_mv_go_simpsons_s06e14_barts_comet=function(btn,url){\nbtn.disabled=true;\nvar f=document.getElementById(fid);\nif(!f){f=document.createElement('iframe');f.id=fid;f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){syncMv();},600);\n};\nsyncMv();setInterval(syncMv,2000);\n})();\n</script>\n<div class=\"movie-wrap\">\n  <div class=\"movie-cell-head\">Simpsons S6E14 \"Bart's Comet\"</div>\n  <button type=\"button\" class=\"silo-btn silo-btn--purple\" id=\"_silo_mv_btn_simpsons_s06e14_barts_comet\" disabled onclick='window.silo_mv_go_simpsons_s06e14_barts_comet(this, \"http://localhost:5001/action/show-movie?user_id=${user_id}&movie_id=simpsons_s06e14_barts_comet\")'>Screen</button>\n</div>"
+      }
+    },
+    {
+      "type": "bargauge",
+      "description": "Screening progress (percent full when complete). MOVIE_SCREENING_DURATION_SECONDS in app/constants.py (60s).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-purple",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 69,
+      "title": "Screening progress",
+      "gridPos": {
+        "x": 9,
+        "y": 17,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN (SELECT movie_screening_movie_id FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) = 'simpsons_s06e14_barts_comet'\n         AND (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1) IS NOT NULL\n    THEN LEAST(100::double precision,\n      GREATEST(0::double precision,\n        100.0 * EXTRACT(EPOCH FROM (\n          NOW() - (SELECT movie_screening_started_at FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1)\n        )) / 60.0))\n    ELSE 0::double precision\n  END AS screening_progress\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "description": "Fatigue for this title after a screening completes (+MOVIE_EXHAUSTION_GAIN_PER_PLAY per completion, same for all movies); decays per MOVIE_EXHAUSTION_DECAY_PER_SECOND.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-orange",
+                "value": 40
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 70
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 12,
+        "minVizWidth": 0,
+        "namePlacement": "hidden",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 70,
+      "title": "Exhaustion",
+      "gridPos": {
+        "x": 12,
+        "y": 17,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, COALESCE(\n    (SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'simpsons_s06e14_barts_comet'),\n    0::double precision\n  )) AS exhaustion\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 15
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 71,
+      "title": "Boredom Reduction",
+      "description": "Next screening boredom relief: boredom_relief_base from MOVIES, scaled by screenings_completed and exhaustion (same formula as game_tick).",
+      "gridPos": {
+        "x": 15,
+        "y": 17,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (9.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'simpsons_s06e14_barts_comet'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'simpsons_s06e14_barts_comet'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-blue",
+                "value": null
+              },
+              {
+                "color": "semi-dark-blue",
+                "value": 8
+              },
+              {
+                "color": "blue",
+                "value": 22
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 72,
+      "title": "Doubt Reduction",
+      "description": "Next screening doubt relief: doubt_relief_base from MOVIES in app/constants.py, with SOCIAL_MOVIE_DIMINISH_K and exhaustion scaling (matches completion tick).",
+      "gridPos": {
+        "x": 18,
+        "y": 17,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    (0.0::double precision / (1.0 + 0.45::double precision * COALESCE((SELECT screenings_completed FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'simpsons_s06e14_barts_comet'), 0)::double precision))\n    * (100.0 - LEAST(100.0, COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'simpsons_s06e14_barts_comet'), 0)::double precision))\n    / 100.0\n  ) AS reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1e-06
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 73,
+      "title": "Loyalty Reduction",
+      "description": "Share of movie-exhaustion loyalty drain when combined exhaustion ≥ 50. MOVIE_EXHAUSTION_LOYALTY_DRAIN_PER_SECOND_AT_FULL=0.06/s.",
+      "gridPos": {
+        "x": 21,
+        "y": 17,
+        "w": 3,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision) < 50::double precision\n    THEN 0::double precision\n    ELSE\n      (\n        (LEAST(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 100::double precision) - 50::double precision)\n        / 50.0 * 0.06::double precision\n      )\n      * (\n          COALESCE((SELECT exhaustion FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid AND movie_id = 'simpsons_s06e14_barts_comet'), 0::double precision)\n          / NULLIF(COALESCE((SELECT SUM(exhaustion) FROM player_movie_exhaustion WHERE user_id = '$user_id'::uuid), 0::double precision), 0::double precision)\n        )\n  END AS loyalty_reduction\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
       "id": 10,
       "type": "text",
       "title": "Social programs",
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 20,
         "w": 14,
-        "h": 9
+        "h": 12
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.silo-btn {\n  display: inline-block;\n  padding: 11px 22px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 14px;\n  letter-spacing: 0.4px;\n  font-family: Inter, sans-serif;\n  box-shadow: 0 2px 6px rgba(0,0,0,0.4);\n  transition: opacity 0.15s;\n  color: #fff;\n}\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--purple { background: #8957e5; }\n.silo-btn--teal { background: #238636; }\n.silo-btn--gold { background: #9e6a03; }\n.silo-btn--orange { background: #e67e00; }\n</style>\n<script>\nfunction _siloSyncSocialButtons() {\n  var m = document.getElementById('_silo_movie_btn');\n  var s = document.getElementById('_silo_speech_btn');\n  var c = document.getElementById('_silo_council_btn');\n  if (!m || !s || !c) return;\n  fetch('http://localhost:5001/socials/action-status?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      m.disabled = !d.can_show_movie;\n      s.disabled = !d.can_give_speech;\n      c.disabled = !d.can_meet_council;\n    })\n    .catch(function() {\n      m.disabled = true;\n      s.disabled = true;\n      c.disabled = true;\n    });\n}\nfunction _siloSocialSyncInvestigateBtn() {\n  var btn = document.getElementById('_silo_social_investigate_btn');\n  var hint = document.getElementById('_silo_social_inv_hint');\n  if (!btn) return;\n  fetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}&system=social')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      btn.disabled = !d.can_dispatch;\n      if (hint) hint.textContent = 'Requires ' + d.team_required + ' idle residents (unassigned to crank, farm, or sweep).';\n    })\n    .catch(function() { btn.disabled = true; });\n}\nfunction siloAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloSyncSocialButtons();\n    _siloSocialSyncInvestigateBtn();\n  }, 600);\n}\n_siloSyncSocialButtons();\n_siloSocialSyncInvestigateBtn();\nsetInterval(_siloSyncSocialButtons, 2000);\nsetInterval(_siloSocialSyncInvestigateBtn, 2000);\n</script>\n<div style=\"padding: 20px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <div style=\"display: flex; gap: 12px; flex-wrap: wrap; align-items: center;\">\n    <button type=\"button\" class=\"silo-btn silo-btn--purple\" id=\"_silo_movie_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/show-movie?user_id=${user_id}')\">SHOW MOVIE</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--teal\" id=\"_silo_speech_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/give-speech?user_id=${user_id}')\">GIVE SPEECH</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gold\" id=\"_silo_council_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/meet-council?user_id=${user_id}')\">MEET WITH COUNCIL</button>\n  </div>\n  <div style=\"margin-top:14px; padding-top:14px; border-top:1px solid #333;\">\n  <p style=\"margin:0 0 10px; color:#c9a227; font-size:13px; font-weight:600;\">Routine compartment sweep</p>\n  <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_social_investigate_btn\" disabled onclick=\"siloAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=social')\">Send investigation team</button>\n  <p id=\"_silo_social_inv_hint\" style=\"margin:10px 0 0; color:#666; font-size:11px;\"></p>\n</div>\n  <p style=\"margin:14px 0 0; color:#666; font-size:12px;\">Movie and speech: 5-minute cooldown each; effects weaken with repeated use. Council: 10-minute cooldown; outcomes appear only in the message log above.</p>\n</div>"
+        "content": "<style>\n.silo-btn {\n  display: inline-block;\n  padding: 11px 22px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 14px;\n  letter-spacing: 0.4px;\n  font-family: Inter, sans-serif;\n  box-shadow: 0 2px 6px rgba(0,0,0,0.4);\n  transition: opacity 0.15s;\n  color: #fff;\n}\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--teal { background: #238636; }\n.silo-btn--gold { background: #9e6a03; }\n.silo-btn--orange { background: #e67e00; }\n.silo-btn--rose { background: #bf4b8a; }\n.silo-btn--small { font-size: 11px; padding: 8px 12px; }\n.silo-sub { margin: 10px 0 6px; color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }\n</style>\n<script>\nfunction _siloSyncSocialButtons() {\n  var uidEnc = encodeURIComponent('${user_id}');\n  var base = 'http://localhost:5001';\n  Promise.all([\n    fetch(base + '/socials/action-status?user_id=' + uidEnc).then(function(r){ return r.json(); }),\n    fetch(base + '/systems/worker-assignment-status?user_id=' + uidEnc).then(function(r){ return r.json(); })\n  ]).then(function(pair) {\n    var d = pair[0];\n    var w = pair[1];\n    var sermonBtn = document.getElementById('_silo_sermon_btn');\n    var s = document.getElementById('_silo_speech_btn');\n    var c = document.getElementById('_silo_council_btn');\n    var th = document.getElementById('_silo_theatre_hire_btn');\n    var tf = document.getElementById('_silo_theatre_fire_btn');\n    if (sermonBtn) sermonBtn.disabled = !d.can_start_sermon;\n    if (s) s.disabled = !d.can_give_speech;\n    if (c) c.disabled = !d.can_meet_council;\n    if (th) th.disabled = d.actions_locked || !w.can_hire_theatre;\n    if (tf) tf.disabled = d.actions_locked || !w.can_fire_theatre;\n    var st = document.getElementById('_silo_theatre_status');\n    if (st) {\n      st.textContent = 'Theatre: phase ' + (d.theatre_phase || '?') + ', actors ' + (d.theatre_actor_count||0)\n        + (d.theatre_next_performance_seconds_remaining > 0 ? ', next show ~' + d.theatre_next_performance_seconds_remaining + 's' : '');\n    }\n  }).catch(function() {\n    ['_silo_sermon_btn','_silo_speech_btn','_silo_council_btn','_silo_theatre_hire_btn','_silo_theatre_fire_btn'].forEach(function(id) {\n      var el = document.getElementById(id);\n      if (el) el.disabled = true;\n    });\n  });\n}\nfunction _siloSocialSyncInvestigateBtn() {\n  var btn = document.getElementById('_silo_social_investigate_btn');\n  var hint = document.getElementById('_silo_social_inv_hint');\n  if (!btn) return;\n  fetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      btn.disabled = !d.can_dispatch;\n      if (hint) hint.textContent = 'Requires ' + d.team_required + ' idle residents (crank, farm, rats, theatre excluded).';\n    })\n    .catch(function() { btn.disabled = true; });\n}\nfunction siloAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloSyncSocialButtons();\n    _siloSocialSyncInvestigateBtn();\n  }, 600);\n}\n_siloSyncSocialButtons();\n_siloSocialSyncInvestigateBtn();\nsetInterval(_siloSyncSocialButtons, 2000);\nsetInterval(_siloSocialSyncInvestigateBtn, 2000);\n</script>\n<div style=\"padding: 20px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <p class=\"silo-sub\">Leadership</p>\n  <div style=\"display: flex; gap: 12px; flex-wrap: wrap; align-items: center;\">\n    <button type=\"button\" class=\"silo-btn silo-btn--rose\" id=\"_silo_sermon_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/start-sermon?user_id=${user_id}')\">HOLD SERMON</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--teal\" id=\"_silo_speech_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/give-speech?user_id=${user_id}')\">GIVE SPEECH</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gold\" id=\"_silo_council_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/meet-council?user_id=${user_id}')\">MEET WITH COUNCIL</button>\n  </div>\n  <p class=\"silo-sub\">Community theatre</p>\n  <div style=\"display: flex; gap: 10px; flex-wrap: wrap; align-items: center;\">\n    <button type=\"button\" class=\"silo-btn silo-btn--teal silo-btn--small\" id=\"_silo_theatre_hire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-theatre?user_id=${user_id}&delta=1')\">HIRE ACTOR</button>\n    <button type=\"button\" class=\"silo-btn silo-btn--gold silo-btn--small\" id=\"_silo_theatre_fire_btn\" onclick=\"siloAction(this, 'http://localhost:5001/action/adjust-theatre?user_id=${user_id}&delta=-1')\">RELEASE ACTOR</button>\n  </div>\n  <p id=\"_silo_theatre_status\" style=\"margin:8px 0 0;color:#666;font-size:11px;\"></p>\n  <div style=\"margin-top:14px; padding-top:14px; border-top:1px solid #333;\">\n    <p style=\"margin:0 0 10px; color:#c9a227; font-size:13px; font-weight:600;\">Routine compartment sweep</p>\n    <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_social_investigate_btn\" disabled onclick=\"siloAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=social')\">Send investigation team</button>\n    <p id=\"_silo_social_inv_hint\" style=\"margin:10px 0 0; color:#666; font-size:11px;\"></p>\n  </div>\n  <p style=\"margin:14px 0 0; color:#666; font-size:12px;\">The movie screen above shows pure noise when idle or the clean screening clip while playing. Movie controls are to the right of the screen: interaction, screening progress, exhaustion, boredom reduction, doubt reduction, loyalty reduction. Screenings run one minute; boredom, doubt, and exhaustion update when a screening ends (catalog in app/constants.py MOVIES).</p>\n</div>"
       }
     },
     {
@@ -97,9 +1701,9 @@
       "datasource": null,
       "gridPos": {
         "x": 14,
-        "y": 8,
+        "y": 20,
         "w": 10,
-        "h": 9
+        "h": 12
       },
       "options": {
         "mode": "html",
@@ -116,7 +1720,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 32,
         "w": 8,
         "h": 10
       },
@@ -175,7 +1779,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 17,
+        "y": 32,
         "w": 8,
         "h": 10
       },
@@ -234,7 +1838,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 17,
+        "y": 32,
         "w": 8,
         "h": 10
       },

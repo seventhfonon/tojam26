@@ -41,7 +41,14 @@ from .events import (
     rat_trapper_food_production_per_second,
     try_dispatch_investigation,
 )
-from .jobs import noisy_radiation_display, normalize_worker_assignments
+from .jobs import (
+    current_bad_apple_frame_index,
+    noisy_radiation_display,
+    normalize_worker_assignments,
+    record_environment_pixel_noise_sample,
+    record_social_movie_pixel_sample,
+    reset_social_movie_pixel_frame_for_screening,
+)
 from .models import (
     BunkerBoredom,
     BunkerCropPlot,
@@ -53,8 +60,10 @@ from .models import (
     BunkerPowerCrankSystem,
     BunkerProfession,
     BunkerSocialState,
+    BunkerTheatreSystem,
     EnergyReserve,
     FoodReserve,
+    PlayerMovieExhaustion,
     RadiationLevel,
     SystemMessage,
     User,
@@ -65,6 +74,7 @@ from .professions import (
     PROFESSION_INVESTIGATION,
     PROFESSION_POWER_CRANK,
     PROFESSION_RAT_TRAPPING,
+    PROFESSION_THEATRE,
 )
 from .social_flavor import NEGATIVE_COUNCIL_MESSAGES, POSITIVE_COUNCIL_MESSAGES
 
@@ -97,6 +107,12 @@ def _seed_bunker_facilities(user: User) -> None:
         count=0,
         updated_at=now,
     )
+    theatre_line = BunkerProfession(
+        user_id=uid,
+        profession=PROFESSION_THEATRE,
+        count=0,
+        updated_at=now,
+    )
     idle_line = BunkerProfession(
         user_id=uid,
         profession=PROFESSION_IDLE,
@@ -109,7 +125,9 @@ def _seed_bunker_facilities(user: User) -> None:
         count=0,
         updated_at=now,
     )
-    db.session.add_all([crank_line, farm_line, rat_line, idle_line, investigation_line])
+    db.session.add_all(
+        [crank_line, farm_line, rat_line, theatre_line, idle_line, investigation_line]
+    )
     db.session.flush()
     db.session.add(
         BunkerLightingSystem(user_id=uid, lights_on=True, updated_at=now),
@@ -126,6 +144,15 @@ def _seed_bunker_facilities(user: User) -> None:
             user_id=uid,
             profession_line_id=farm_line.id,
             rat_trapper_line_id=rat_line.id,
+            updated_at=now,
+        ),
+    )
+    db.session.add(
+        BunkerTheatreSystem(
+            user_id=uid,
+            profession_line_id=theatre_line.id,
+            phase=constants.THEATRE_PHASE_IDLE,
+            phase_entered_at=now,
             updated_at=now,
         ),
     )
@@ -151,6 +178,14 @@ def _get_farming_system(user_id: str) -> BunkerFarmingSystem | None:
             selectinload(BunkerFarmingSystem.profession_line),
             selectinload(BunkerFarmingSystem.rat_trapper_line),
         )
+    ).first()
+
+
+def _get_theatre_system(user_id: str) -> BunkerTheatreSystem | None:
+    return db.session.scalars(
+        select(BunkerTheatreSystem)
+        .where(BunkerTheatreSystem.user_id == user_id)
+        .options(selectinload(BunkerTheatreSystem.profession_line))
     ).first()
 
 
@@ -303,6 +338,22 @@ def _social_cooldown_remaining_seconds(
     return max(0, math.ceil(rem)) if rem > 0 else 0
 
 
+def _player_actions_locked(user: User, now: datetime) -> bool:
+    """True during wall-clock sermon window."""
+    bu = user.sermon_busy_until
+    return bu is not None and now < bu
+
+
+def _reject_if_sermon_locked(user: User | None):
+    """Return iframe redirect response when sermon blocks actions; else None."""
+    if user is None:
+        return None
+    now = datetime.now(timezone.utc)
+    if _player_actions_locked(user, now):
+        return _action_response(user.id)
+    return None
+
+
 def _create_player() -> User:
     """Always mint a fresh UUID and seed all game-state tables."""
     user = User(id=str(uuid4()))
@@ -352,6 +403,12 @@ def _create_player() -> User:
             inner_circle_loyalty=constants.INITIAL_INNER_CIRCLE_LOYALTY,
         )
     )
+    record_environment_pixel_noise_sample(
+        user.id,
+        datetime.now(timezone.utc),
+        current_bad_apple_frame_index(),
+    )
+    record_social_movie_pixel_sample(user.id, datetime.now(timezone.utc))
     db.session.commit()
     return user
 
@@ -406,6 +463,10 @@ def action_crank():
     if user is None:
         return redirect("/new")
 
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
     latest = db.session.scalars(
         select(EnergyReserve)
         .where(EnergyReserve.user_id == user.id)
@@ -433,6 +494,10 @@ def action_toggle_lights():
     if user is None:
         return redirect("/new")
 
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
     lighting = db.session.get(BunkerLightingSystem, user.id)
     if lighting is not None:
         lighting.lights_on = not lighting.lights_on
@@ -455,6 +520,10 @@ def action_adjust_crank():
     if user is None:
         return redirect("/new")
 
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
     try:
         delta = int(request.args.get("delta", 0))
     except (ValueError, TypeError):
@@ -470,6 +539,7 @@ def action_adjust_crank():
 
     crank_sys = _get_power_crank_system(user.id)
     farm_sys = _get_farming_system(user.id)
+    theatre_sys = _get_theatre_system(user.id)
     idle_line = _idle_profession_line(user.id)
     inv_line = _investigation_profession_line(user.id)
     if (
@@ -478,6 +548,8 @@ def action_adjust_crank():
         or farm_sys is None
         or farm_sys.profession_line is None
         or farm_sys.rat_trapper_line is None
+        or theatre_sys is None
+        or theatre_sys.profession_line is None
     ):
         return _action_response(user.id)
 
@@ -485,6 +557,7 @@ def action_adjust_crank():
     crank_line = crank_sys.profession_line
     farm_line = farm_sys.profession_line
     rat_line = farm_sys.rat_trapper_line
+    theatre_line = theatre_sys.profession_line
 
     if delta > 0:
         crank_line.count += 1
@@ -492,10 +565,18 @@ def action_adjust_crank():
         crank_line.count -= 1
     crank_line.count = max(0, min(crank_line.count, max_workers))
     normalize_worker_assignments(
-        crank_line, farm_line, rat_line, idle_line, inv_line, max_workers, now
+        crank_line,
+        farm_line,
+        rat_line,
+        theatre_line,
+        idle_line,
+        inv_line,
+        max_workers,
+        now,
     )
     crank_sys.updated_at = now
     farm_sys.updated_at = now
+    theatre_sys.updated_at = now
     db.session.commit()
     log.info(
         "adjust crank workers: user=%s delta=%+d crank=%d food=%d",
@@ -515,6 +596,10 @@ def action_adjust_food():
     if user is None:
         return redirect("/new")
 
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
     try:
         delta = int(request.args.get("delta", 0))
     except (ValueError, TypeError):
@@ -530,6 +615,7 @@ def action_adjust_food():
 
     crank_sys = _get_power_crank_system(user.id)
     farm_sys = _get_farming_system(user.id)
+    theatre_sys = _get_theatre_system(user.id)
     idle_line = _idle_profession_line(user.id)
     inv_line = _investigation_profession_line(user.id)
     if (
@@ -538,6 +624,8 @@ def action_adjust_food():
         or farm_sys is None
         or farm_sys.profession_line is None
         or farm_sys.rat_trapper_line is None
+        or theatre_sys is None
+        or theatre_sys.profession_line is None
     ):
         return _action_response(user.id)
 
@@ -545,6 +633,7 @@ def action_adjust_food():
     crank_line = crank_sys.profession_line
     farm_line = farm_sys.profession_line
     rat_line = farm_sys.rat_trapper_line
+    theatre_line = theatre_sys.profession_line
 
     if delta > 0:
         farm_line.count += 1
@@ -552,10 +641,18 @@ def action_adjust_food():
         farm_line.count -= 1
     farm_line.count = max(0, min(farm_line.count, max_workers))
     normalize_worker_assignments(
-        crank_line, farm_line, rat_line, idle_line, inv_line, max_workers, now
+        crank_line,
+        farm_line,
+        rat_line,
+        theatre_line,
+        idle_line,
+        inv_line,
+        max_workers,
+        now,
     )
     crank_sys.updated_at = now
     farm_sys.updated_at = now
+    theatre_sys.updated_at = now
     db.session.commit()
     log.info(
         "adjust food workers: user=%s delta=%+d crank=%d food=%d",
@@ -575,6 +672,10 @@ def action_adjust_rat_trappers():
     if user is None:
         return redirect("/new")
 
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
     try:
         delta = int(request.args.get("delta", 0))
     except (ValueError, TypeError):
@@ -590,6 +691,7 @@ def action_adjust_rat_trappers():
 
     crank_sys = _get_power_crank_system(user.id)
     farm_sys = _get_farming_system(user.id)
+    theatre_sys = _get_theatre_system(user.id)
     idle_line = _idle_profession_line(user.id)
     inv_line = _investigation_profession_line(user.id)
     if (
@@ -598,13 +700,19 @@ def action_adjust_rat_trappers():
         or farm_sys is None
         or farm_sys.profession_line is None
         or farm_sys.rat_trapper_line is None
+        or theatre_sys is None
+        or theatre_sys.profession_line is None
     ):
+        return _action_response(user.id)
+
+    if delta > 0 and not bool(user.rat_trappers_unlocked):
         return _action_response(user.id)
 
     now = datetime.now(timezone.utc)
     crank_line = crank_sys.profession_line
     farm_line = farm_sys.profession_line
     rat_line = farm_sys.rat_trapper_line
+    theatre_line = theatre_sys.profession_line
 
     if delta > 0:
         rat_line.count += 1
@@ -612,10 +720,18 @@ def action_adjust_rat_trappers():
         rat_line.count -= 1
     rat_line.count = max(0, min(rat_line.count, max_workers))
     normalize_worker_assignments(
-        crank_line, farm_line, rat_line, idle_line, inv_line, max_workers, now
+        crank_line,
+        farm_line,
+        rat_line,
+        theatre_line,
+        idle_line,
+        inv_line,
+        max_workers,
+        now,
     )
     crank_sys.updated_at = now
     farm_sys.updated_at = now
+    theatre_sys.updated_at = now
     db.session.commit()
     log.info(
         "adjust rat trappers: user=%s delta=%+d crank=%d food=%d trappers=%d",
@@ -629,12 +745,91 @@ def action_adjust_rat_trappers():
     return _action_response(user.id)
 
 
+@bp.route("/action/adjust-theatre")
+def action_adjust_theatre():
+    """Increment or decrement actors (shared resident pool)."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
+    try:
+        delta = int(request.args.get("delta", 0))
+    except (ValueError, TypeError):
+        delta = 0
+
+    latest_pop = db.session.scalars(
+        select(BunkerPopulation)
+        .where(BunkerPopulation.user_id == user.id)
+        .order_by(BunkerPopulation.timestamp.desc())
+        .limit(1)
+    ).first()
+    max_workers = latest_pop.count if latest_pop is not None else 0
+
+    crank_sys = _get_power_crank_system(user.id)
+    farm_sys = _get_farming_system(user.id)
+    theatre_sys = _get_theatre_system(user.id)
+    idle_line = _idle_profession_line(user.id)
+    inv_line = _investigation_profession_line(user.id)
+    if (
+        crank_sys is None
+        or crank_sys.profession_line is None
+        or farm_sys is None
+        or farm_sys.profession_line is None
+        or farm_sys.rat_trapper_line is None
+        or theatre_sys is None
+        or theatre_sys.profession_line is None
+    ):
+        return _action_response(user.id)
+
+    now = datetime.now(timezone.utc)
+    crank_line = crank_sys.profession_line
+    farm_line = farm_sys.profession_line
+    rat_line = farm_sys.rat_trapper_line
+    theatre_line = theatre_sys.profession_line
+
+    if delta > 0:
+        theatre_line.count += 1
+    elif delta < 0:
+        theatre_line.count -= 1
+    theatre_line.count = max(0, min(theatre_line.count, max_workers))
+    normalize_worker_assignments(
+        crank_line,
+        farm_line,
+        rat_line,
+        theatre_line,
+        idle_line,
+        inv_line,
+        max_workers,
+        now,
+    )
+    crank_sys.updated_at = now
+    farm_sys.updated_at = now
+    theatre_sys.updated_at = now
+    db.session.commit()
+    log.info(
+        "adjust theatre actors: user=%s delta=%+d actors=%d",
+        user.id,
+        delta,
+        theatre_line.count,
+    )
+
+    return _action_response(user.id)
+
+
 @bp.route("/action/farming-plot")
 def action_farming_plot():
     """Plant / harvest one bay; harvest food scales with mean farm workers during that growth."""
     user = _identify_player()
     if user is None:
         return redirect("/new")
+
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
 
     raw_plot = request.args.get("plot")
     try:
@@ -741,37 +936,55 @@ def action_farming_plot():
 
 @bp.route("/action/show-movie")
 def action_show_movie():
-    """Reduce boredom; 5-minute cooldown; diminishing returns per use."""
+    """Start a catalog screening: pay energy now; boredom relief + exhaustion after duration."""
     user = _identify_player()
     if user is None:
         return redirect("/new")
 
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
+    movie_id = (request.args.get("movie_id") or "").strip()
+    spec = constants.MOVIES_BY_ID.get(movie_id)
+    if spec is None:
+        return _action_response(user.id)
+
     now = datetime.now(timezone.utc)
     social = _get_or_create_social_state(user.id)
-    cd = constants.SOCIAL_MOVIE_COOLDOWN_SECONDS
-    if _social_cooldown_remaining_seconds(social.last_show_movie_at, cd, now) > 0:
+    if social.movie_screening_movie_id is not None:
         return _action_response(user.id)
 
-    latest = db.session.scalars(
-        select(BunkerBoredom)
-        .where(BunkerBoredom.user_id == user.id)
-        .order_by(BunkerBoredom.timestamp.desc())
+    latest_energy = db.session.scalars(
+        select(EnergyReserve)
+        .where(EnergyReserve.user_id == user.id)
+        .order_by(EnergyReserve.timestamp.desc())
         .limit(1)
     ).first()
-    if latest is None:
+    if latest_energy is None:
         return _action_response(user.id)
 
-    base = constants.SOCIAL_MOVIE_BOREDOM_RELIEF_BASE
-    k = constants.SOCIAL_MOVIE_DIMINISH_K
-    uses = social.movie_action_count
-    relief = base / (1.0 + k * uses)
-    new_boredom = max(0.0, latest.boredom - relief)
+    if latest_energy.level + 1e-9 < spec.energy_cost:
+        return _action_response(user.id)
 
-    social.movie_action_count = uses + 1
-    social.last_show_movie_at = now
-    db.session.add(BunkerBoredom(user_id=user.id, boredom=new_boredom, timestamp=now))
+    social.movie_screening_movie_id = movie_id
+    social.movie_screening_started_at = now
+    reset_social_movie_pixel_frame_for_screening(user.id)
+    record_social_movie_pixel_sample(user.id, now)
+
+    new_energy = max(0.0, latest_energy.level - spec.energy_cost)
+    db.session.add(
+        EnergyReserve(user_id=user.id, level=new_energy, timestamp=now),
+    )
+
     db.session.commit()
-    log.info("show movie: user=%s boredom %.2f→%.2f", user.id, latest.boredom, new_boredom)
+    log.info(
+        "show movie started: user=%s movie=%s energy %.2f→%.2f",
+        user.id,
+        movie_id,
+        latest_energy.level,
+        new_energy,
+    )
 
     return _action_response(user.id)
 
@@ -782,6 +995,10 @@ def action_give_speech():
     user = _identify_player()
     if user is None:
         return redirect("/new")
+
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
 
     now = datetime.now(timezone.utc)
     social = _get_or_create_social_state(user.id)
@@ -836,6 +1053,10 @@ def action_meet_council():
     if user is None:
         return redirect("/new")
 
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
     now = datetime.now(timezone.utc)
     social = _get_or_create_social_state(user.id)
     cd = constants.SOCIAL_COUNCIL_COOLDOWN_SECONDS
@@ -861,35 +1082,195 @@ def action_meet_council():
     return _action_response(user.id)
 
 
+@bp.route("/action/start-sermon")
+def action_start_sermon():
+    """Block other actions until sermon completes; loyalty reward applied on next tick after."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    now = datetime.now(timezone.utc)
+    if user.sermon_busy_until is not None and now < user.sermon_busy_until:
+        return _action_response(user.id)
+
+    user.sermon_busy_until = now + timedelta(seconds=constants.SERMON_DURATION_SECONDS)
+    user.sermon_reward_pending = True
+    db.session.commit()
+    log.info("start sermon: user=%s busy_until=%s", user.id, user.sermon_busy_until)
+
+    return _action_response(user.id)
+
+
+def _social_movie_status_detail(user: User, now: datetime) -> dict[str, object]:
+    """Per-title screening stats for Grafana movie rows (see ``/socials/movie-status``)."""
+    movie_cd = constants.SOCIAL_MOVIE_COOLDOWN_SECONDS
+    actions_locked = _player_actions_locked(user, now)
+    social = db.session.get(BunkerSocialState, user.id)
+    movie_rem = 0
+    screening_mid: str | None = None
+    screening_started: datetime | None = None
+    if social is not None:
+        movie_rem = _social_cooldown_remaining_seconds(
+            social.last_show_movie_at, movie_cd, now
+        )
+        screening_mid = social.movie_screening_movie_id
+        screening_started = social.movie_screening_started_at
+
+    # Screening runtime is the throttle; no extra cooldown after a screening ends.
+    can_show_movie = not actions_locked and screening_mid is None
+
+    latest_energy = db.session.scalars(
+        select(EnergyReserve)
+        .where(EnergyReserve.user_id == user.id)
+        .order_by(EnergyReserve.timestamp.desc())
+        .limit(1)
+    ).first()
+    energy_level = float(latest_energy.level) if latest_energy is not None else 0.0
+
+    exh_rows = db.session.scalars(
+        select(PlayerMovieExhaustion).where(PlayerMovieExhaustion.user_id == user.id)
+    ).all()
+    exhaust_by_id = {r.movie_id: float(r.exhaustion) for r in exh_rows}
+
+    movies_out: list[dict[str, object]] = []
+    for spec in constants.MOVIES:
+        exh = exhaust_by_id.get(spec.id, 0.0)
+        cost = float(spec.energy_cost)
+        can_play = can_show_movie and energy_level + 1e-9 >= cost
+        movies_out.append(
+            {
+                "id": spec.id,
+                "title": spec.title,
+                "energy_cost": cost,
+                "exhaustion": exh,
+                "can_play": can_play,
+            }
+        )
+
+    return {
+        "actions_locked": actions_locked,
+        "movie_cooldown_seconds_remaining": movie_rem,
+        "can_show_movie": can_show_movie,
+        "energy_level": energy_level,
+        "movie_exhaustion_decay_per_second": float(constants.MOVIE_EXHAUSTION_DECAY_PER_SECOND),
+        "movie_screening_duration_seconds": float(constants.MOVIE_SCREENING_DURATION_SECONDS),
+        "screening_movie_id": screening_mid,
+        "screening_started_at": screening_started.isoformat()
+        if screening_started is not None
+        else None,
+        "movies": movies_out,
+    }
+
+
 @bp.route("/socials/action-status")
 def socials_action_status():
     """JSON for Grafana: social action cooldown readiness."""
     user = _identify_player()
     now = datetime.now(timezone.utc)
-    movie_cd = constants.SOCIAL_MOVIE_COOLDOWN_SECONDS
     speech_cd = constants.SOCIAL_SPEECH_COOLDOWN_SECONDS
     council_cd = constants.SOCIAL_COUNCIL_COOLDOWN_SECONDS
 
     movie_rem = 0
     speech_rem = 0
     council_rem = 0
+    actions_locked = False
+    sermon_rem = 0
+    movies_payload: list[dict[str, object]] = []
+    theatre_phase = constants.THEATRE_PHASE_IDLE
+    theatre_actors = 0
+    theatre_next_perf_rem = 0
+
+    can_show_movie_flag = False
+
     if user is not None:
+        md = _social_movie_status_detail(user, now)
+        movie_rem = int(md["movie_cooldown_seconds_remaining"])
+        actions_locked = bool(md["actions_locked"])
+        can_show_movie_flag = bool(md["can_show_movie"])
+        movies_payload = [
+            {
+                "id": m["id"],
+                "title": m["title"],
+                "energy_cost": m["energy_cost"],
+                "exhaustion": m["exhaustion"],
+            }
+            for m in md["movies"]
+        ]
+
+        if user.sermon_busy_until is not None and now < user.sermon_busy_until:
+            sermon_rem = max(
+                0,
+                math.ceil((user.sermon_busy_until - now).total_seconds()),
+            )
+
         social = db.session.get(BunkerSocialState, user.id)
         if social is not None:
-            movie_rem = _social_cooldown_remaining_seconds(social.last_show_movie_at, movie_cd, now)
-            speech_rem = _social_cooldown_remaining_seconds(social.last_give_speech_at, speech_cd, now)
-            council_rem = _social_cooldown_remaining_seconds(social.last_meet_council_at, council_cd, now)
+            speech_rem = _social_cooldown_remaining_seconds(
+                social.last_give_speech_at, speech_cd, now
+            )
+            council_rem = _social_cooldown_remaining_seconds(
+                social.last_meet_council_at, council_cd, now
+            )
+
+        theatre_sys = _get_theatre_system(user.id)
+        if theatre_sys is not None:
+            theatre_phase = theatre_sys.phase
+            if theatre_sys.profession_line is not None:
+                theatre_actors = theatre_sys.profession_line.count
+            if theatre_sys.next_performance_at is not None:
+                theatre_next_perf_rem = max(
+                    0,
+                    math.ceil((theatre_sys.next_performance_at - now).total_seconds()),
+                )
 
     resp = jsonify(
         {
-            "can_show_movie": movie_rem == 0,
-            "can_give_speech": speech_rem == 0,
-            "can_meet_council": council_rem == 0,
+            "actions_locked": actions_locked,
+            "sermon_seconds_remaining": sermon_rem,
+            "can_start_sermon": user is not None and not actions_locked,
+            "can_show_movie": can_show_movie_flag,
+            "can_give_speech": user is not None and speech_rem == 0 and not actions_locked,
+            "can_meet_council": user is not None and council_rem == 0 and not actions_locked,
             "movie_cooldown_seconds_remaining": movie_rem,
             "speech_cooldown_seconds_remaining": speech_rem,
             "council_cooldown_seconds_remaining": council_rem,
+            "movies": movies_payload,
+            "theatre_phase": theatre_phase,
+            "theatre_actor_count": theatre_actors,
+            "theatre_next_performance_seconds_remaining": theatre_next_perf_rem,
         }
     )
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@bp.route("/socials/movie-status")
+def socials_movie_status():
+    """JSON for Grafana: per-movie interaction rows (energy, screening state)."""
+    user = _identify_player()
+    now = datetime.now(timezone.utc)
+    if user is None:
+        resp = jsonify(
+            {
+                "actions_locked": True,
+                "movie_cooldown_seconds_remaining": 0,
+                "can_show_movie": False,
+                "energy_level": 0.0,
+                "movie_exhaustion_decay_per_second": float(
+                    constants.MOVIE_EXHAUSTION_DECAY_PER_SECOND
+                ),
+                "movie_screening_duration_seconds": float(
+                    constants.MOVIE_SCREENING_DURATION_SECONDS
+                ),
+                "screening_movie_id": None,
+                "screening_started_at": None,
+                "movies": [],
+            }
+        )
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+
+    resp = jsonify(_social_movie_status_detail(user, now))
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
@@ -981,12 +1362,16 @@ def worker_assignment_status():
                 "crank_workers": 0,
                 "farm_workers": 0,
                 "rat_trapper_workers": 0,
+                "theatre_workers": 0,
                 "investigation_workers": 0,
                 "idle_workers": 0,
                 "can_hire": False,
+                "can_hire_rat_trapper": False,
+                "can_hire_theatre": False,
                 "can_fire_crank": False,
                 "can_fire_farm": False,
                 "can_fire_rat_trapper": False,
+                "can_fire_theatre": False,
             }
         )
         resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -1002,6 +1387,7 @@ def worker_assignment_status():
 
     crank_sys = _get_power_crank_system(user.id)
     farm_sys = _get_farming_system(user.id)
+    theatre_sys = _get_theatre_system(user.id)
     crank_line = crank_sys.profession_line if crank_sys is not None else None
     farm_line = farm_sys.profession_line if farm_sys is not None else None
     idle_line = _idle_profession_line(user.id)
@@ -1010,6 +1396,8 @@ def worker_assignment_status():
     farm_workers = farm_line.count if farm_line is not None else 0
     rat_line = farm_sys.rat_trapper_line if farm_sys is not None else None
     rat_trapper_workers = rat_line.count if rat_line is not None else 0
+    theatre_line = theatre_sys.profession_line if theatre_sys is not None else None
+    theatre_workers = theatre_line.count if theatre_line is not None else 0
     inv_line = _investigation_profession_line(user.id)
     investigation_workers = inv_line.count if inv_line is not None else 0
     idle_workers = (
@@ -1021,6 +1409,7 @@ def worker_assignment_status():
             - crank_workers
             - farm_workers
             - rat_trapper_workers
+            - theatre_workers
             - investigation_workers,
         )
     )
@@ -1028,12 +1417,22 @@ def worker_assignment_status():
     facilities_ready = (
         crank_sys is not None
         and farm_sys is not None
+        and theatre_sys is not None
         and crank_line is not None
         and farm_line is not None
         and rat_line is not None
+        and theatre_line is not None
     )
-    assigned = crank_workers + farm_workers + rat_trapper_workers + investigation_workers
+    assigned = (
+        crank_workers
+        + farm_workers
+        + rat_trapper_workers
+        + theatre_workers
+        + investigation_workers
+    )
     can_hire = facilities_ready and population > 0 and assigned < population
+    trap_unlocked = bool(user.rat_trappers_unlocked)
+    can_hire_rat_trapper = can_hire and trap_unlocked
 
     resp = jsonify(
         {
@@ -1041,12 +1440,16 @@ def worker_assignment_status():
             "crank_workers": crank_workers,
             "farm_workers": farm_workers,
             "rat_trapper_workers": rat_trapper_workers,
+            "theatre_workers": theatre_workers,
             "investigation_workers": investigation_workers,
             "idle_workers": idle_workers,
             "can_hire": can_hire,
+            "can_hire_rat_trapper": can_hire_rat_trapper,
+            "can_hire_theatre": can_hire,
             "can_fire_crank": crank_workers > 0,
             "can_fire_farm": farm_workers > 0,
             "can_fire_rat_trapper": rat_trapper_workers > 0,
+            "can_fire_theatre": theatre_workers > 0,
         }
     )
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -1070,6 +1473,10 @@ def action_dispatch_investigation():
     user = _identify_player()
     if user is None:
         return redirect("/new")
+
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
 
     system_q = (request.args.get("system") or "").strip()
     now = datetime.now(timezone.utc)

@@ -43,7 +43,7 @@ def test_game_event_specs_carry_tuning_on_spec():
 
     for spec in REGISTERED_EVENTS:
         assert 0.0 <= spec.spawn_chance_per_tick <= 1.0
-        assert spec.duration_seconds > 0
+        assert spec.duration_seconds is None or spec.duration_seconds > 0
         fx = spec.tick_effects(uid, tick)
         assert fx.food_consumption_multiplier > 0
         assert callable(spec.tick_effects)

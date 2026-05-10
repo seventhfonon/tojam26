@@ -233,6 +233,40 @@ def _ensure_food_reserve_rate_columns() -> None:
         )
 
 
+def _ensure_bunker_social_screening_columns() -> None:
+    """Add in-flight movie screening columns (nullable)."""
+    if "bunker_social_state" not in inspect(db.engine).get_table_names():
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_social_state "
+                "ADD COLUMN IF NOT EXISTS movie_screening_movie_id character varying(64)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_social_state "
+                "ADD COLUMN IF NOT EXISTS movie_screening_started_at "
+                "timestamp with time zone"
+            )
+        )
+
+
+def _ensure_player_movie_exhaustion_screenings_completed() -> None:
+    """Per-title completed screenings (diminishing boredom relief per movie)."""
+    if "player_movie_exhaustion" not in inspect(db.engine).get_table_names():
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE player_movie_exhaustion "
+                "ADD COLUMN IF NOT EXISTS screenings_completed integer "
+                "NOT NULL DEFAULT 0"
+            )
+        )
+
+
 def _ensure_bunker_social_seed_data() -> None:
     """Backfill social tables for users created before social simulation existed."""
     tables = inspect(db.engine).get_table_names()
@@ -529,6 +563,105 @@ def _ensure_user_rat_infestation_columns() -> None:
         )
 
 
+def _ensure_user_rat_trappers_unlocked_column() -> None:
+    """Gate trapper hiring until farming investigation clears ``rats_silo_intro``."""
+    insp = inspect(db.engine)
+    if "users" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    added = "rat_trappers_unlocked" not in cols
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS rat_trappers_unlocked "
+                "BOOLEAN NOT NULL DEFAULT false"
+            )
+        )
+        if added:
+            conn.execute(text("UPDATE users SET rat_trappers_unlocked = TRUE"))
+
+
+def _ensure_player_active_events_auto_resolve_nullable() -> None:
+    """Allow indefinite events (no timer auto-resolve)."""
+    insp = inspect(db.engine)
+    if "player_active_events" not in insp.get_table_names():
+        return
+    col = next(
+        (c for c in insp.get_columns("player_active_events") if c["name"] == "auto_resolve_at"),
+        None,
+    )
+    if col is None or col.get("nullable") is True:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE player_active_events "
+                "ALTER COLUMN auto_resolve_at DROP NOT NULL"
+            )
+        )
+
+
+def _ensure_social_movie_pixel_samples_movie_id_column() -> None:
+    """Tag theatre strips by catalog ``movie_id`` (one advancing clip per ``MOVIES`` row)."""
+    insp = inspect(db.engine)
+    tables = insp.get_table_names()
+    if "social_movie_pixel_samples" not in tables:
+        return
+    cols = {c["name"] for c in insp.get_columns("social_movie_pixel_samples")}
+    if "movie_id" in cols:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE social_movie_pixel_samples "
+                "ADD COLUMN movie_id character varying(64)"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE social_movie_pixel_samples SET movie_id = 'atomic_cafe' "
+                "WHERE movie_id IS NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE social_movie_pixel_samples ALTER COLUMN movie_id SET NOT NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_social_movie_pixel_samples_movie_id "
+                "ON social_movie_pixel_samples (movie_id)"
+            )
+        )
+
+
+def _ensure_bunker_social_movie_pixel_frame_index_column() -> None:
+    """Frame cursor for the single-channel movie heatmap while a screening runs."""
+    insp = inspect(db.engine)
+    if "bunker_social_state" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("bunker_social_state")}
+    if "movie_pixel_frame_index" in cols:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_social_state ADD COLUMN movie_pixel_frame_index "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+
+
+def _drop_legacy_social_movie_pixel_animations_table_if_exists() -> None:
+    """Removed in favor of ``BunkerSocialState.movie_pixel_frame_index``."""
+    insp = inspect(db.engine)
+    if "social_movie_pixel_animations" not in insp.get_table_names():
+        return
+    with db.engine.begin() as conn:
+        conn.execute(text("DROP TABLE social_movie_pixel_animations CASCADE"))
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -543,6 +676,11 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_bunker_systems_farming_columns()
         _ensure_food_reserve_rate_columns()
         _ensure_bunker_social_seed_data()
+        _ensure_bunker_social_screening_columns()
+        _ensure_bunker_social_movie_pixel_frame_index_column()
+        _ensure_player_movie_exhaustion_screenings_completed()
+        _ensure_social_movie_pixel_samples_movie_id_column()
+        _drop_legacy_social_movie_pixel_animations_table_if_exists()
         _migrate_legacy_bunker_systems_table()
         _migrate_bunker_crop_plots_schema()
         _ensure_bunker_crop_plot_growth_tracking_columns()
@@ -552,6 +690,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_investigation_profession_lines()
         _ensure_farming_rat_trapper_lines()
         _ensure_user_rat_infestation_columns()
+        _ensure_user_rat_trappers_unlocked_column()
+        _ensure_player_active_events_auto_resolve_nullable()
 
     _maybe_start_scheduler(app)
 

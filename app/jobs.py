@@ -9,11 +9,17 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from .extensions import db
+from . import bad_apple_frames
 from . import constants
+from . import movie_pixel_frames
+from .environment_pixel_reference import (
+    apply_uniform_tick_noise,
+    environment_pixel_cells_from_reference_image,
+)
 from .models import (
     BunkerBoredom,
     BunkerCropPlot,
@@ -25,8 +31,13 @@ from .models import (
     BunkerPowerCrankSystem,
     BunkerProfession,
     BunkerProfessionSnapshot,
+    BunkerSocialState,
+    BunkerTheatreSystem,
     EnergyReserve,
+    EnvironmentPixelNoiseSample,
     FoodReserve,
+    SocialMoviePixelSample,
+    PlayerMovieExhaustion,
     RadiationLevel,
     SystemMessage,
     User,
@@ -38,6 +49,7 @@ from .professions import (
     PROFESSION_INVESTIGATION,
     PROFESSION_POWER_CRANK,
     PROFESSION_RAT_TRAPPING,
+    PROFESSION_THEATRE,
 )
 from .events import (
     EventDefinition,
@@ -105,6 +117,7 @@ class GameTickReadings:
     lighting: BunkerLightingSystem | None
     power_crank: BunkerPowerCrankSystem | None
     farming: BunkerFarmingSystem | None
+    theatre: BunkerTheatreSystem | None
     idle_profession: BunkerProfession | None
     investigation_profession: BunkerProfession | None
     user: User
@@ -150,6 +163,12 @@ def _rat_trapper_count(readings: GameTickReadings) -> int:
     return readings.farming.rat_trapper_line.count
 
 
+def _theatre_worker_count(readings: GameTickReadings) -> int:
+    if readings.theatre is None or readings.theatre.profession_line is None:
+        return 0
+    return readings.theatre.profession_line.count
+
+
 def _lights_on(readings: GameTickReadings) -> bool:
     if readings.lighting is None:
         return True
@@ -164,7 +183,174 @@ def _facilities_ready(readings: GameTickReadings) -> bool:
         and readings.farming is not None
         and readings.farming.profession_line is not None
         and readings.farming.rat_trapper_line is not None
+        and readings.theatre is not None
+        and readings.theatre.profession_line is not None
     )
+
+
+_bad_apple_frame_seq = 0
+
+
+def advance_bad_apple_frame_index() -> int:
+    """Consume the next Bad Apple frame index (one step per ``game_tick``)."""
+    global _bad_apple_frame_seq
+    n = int(constants.BAD_APPLE_FRAME_COUNT)
+    if n < 1:
+        return 0
+    idx = _bad_apple_frame_seq % n
+    _bad_apple_frame_seq += 1
+    return idx
+
+
+def current_bad_apple_frame_index() -> int:
+    """Frame index for the current animation position without advancing (e.g. new player seed)."""
+    n = int(constants.BAD_APPLE_FRAME_COUNT)
+    if n < 1:
+        return 0
+    return _bad_apple_frame_seq % n
+
+
+def record_environment_pixel_noise_sample(
+    user_id: str,
+    tick_time: datetime,
+    animation_frame_index: int = 0,
+) -> None:
+    """Replace this player's heatmap history with Bad Apple, reference-image luminance, or random noise.
+
+    When ``app/assets/images/bad_apple`` contains ``frame_00.png`` … (see ``BAD_APPLE_FRAME_COUNT``),
+    ``animation_frame_index`` selects the clip frame. Otherwise falls back to
+    ``environment_pixel_reference.png``, then uniform random noise.
+    ``ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE`` jitter applies to sampled luminance frames.
+    """
+    cols_n = int(constants.ENVIRONMENT_PIXEL_GRID_COLS)
+    rows_n = int(constants.ENVIRONMENT_PIXEL_GRID_ROWS)
+    n_snapshots = int(constants.ENVIRONMENT_PIXEL_BACKFILL_SAMPLES)
+    span_s = float(constants.ENVIRONMENT_PIXEL_BACKFILL_SPAN_SECONDS)
+    delta_s = span_s / max(1, n_snapshots - 1) if n_snapshots > 1 else 0.0
+
+    frame: list[list[float]]
+    ba = (
+        bad_apple_frames.bad_apple_cells(animation_frame_index, cols_n, rows_n)
+        if bad_apple_frames.bad_apple_frames_ready()
+        else None
+    )
+    if ba is not None:
+        frame = [list(row) for row in ba]
+        apply_uniform_tick_noise(
+            frame, float(constants.ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE)
+        )
+    else:
+        ref = environment_pixel_cells_from_reference_image(cols_n, rows_n)
+        if ref is None:
+            frame = [[random.random() for _ in range(cols_n)] for _ in range(rows_n)]
+        else:
+            frame = [list(row) for row in ref]
+            apply_uniform_tick_noise(
+                frame, float(constants.ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE)
+            )
+    db.session.execute(
+        delete(EnvironmentPixelNoiseSample).where(
+            EnvironmentPixelNoiseSample.user_id == user_id
+        )
+    )
+    for i in range(n_snapshots):
+        ts = tick_time - timedelta(seconds=(n_snapshots - 1 - i) * delta_s)
+        cells = [frame[r][i] for r in range(rows_n)]
+        db.session.add(
+            EnvironmentPixelNoiseSample(
+                user_id=user_id,
+                timestamp=ts,
+                grid_cols=1,
+                grid_rows=rows_n,
+                cells=cells,
+            )
+        )
+
+
+def reset_social_movie_pixel_frame_for_screening(user_id: str) -> None:
+    """Start the heatmap PNG clip from frame 0 when a screening begins."""
+    social = db.session.get(BunkerSocialState, user_id)
+    if social is not None:
+        social.movie_pixel_frame_index = 0
+
+
+def record_social_movie_pixel_sample(user_id: str, tick_time: datetime) -> None:
+    """Replace movie-screen strips with **one** channel: active screening or idle noise.
+
+    Grafana reads whichever ``movie_id`` matches ``bunker_social_state`` (or the idle sentinel).
+    Only that channel is written each tick—no parallel strips for catalog titles that are not on-screen.
+    """
+    cols_n = int(constants.SOCIAL_MOVIE_PIXEL_GRID_COLS)
+    rows_n = int(constants.SOCIAL_MOVIE_PIXEL_GRID_ROWS)
+    n_snapshots = int(constants.SOCIAL_MOVIE_PIXEL_BACKFILL_SAMPLES)
+    span_s = float(constants.SOCIAL_MOVIE_PIXEL_BACKFILL_SPAN_SECONDS)
+    delta_s = span_s / max(1, n_snapshots - 1) if n_snapshots > 1 else 0.0
+    n_frames = int(constants.SOCIAL_MOVIE_PIXEL_SEQUENCE_FRAME_COUNT)
+
+    db.session.execute(
+        delete(SocialMoviePixelSample).where(SocialMoviePixelSample.user_id == user_id)
+    )
+
+    social = db.session.scalars(
+        select(BunkerSocialState).where(BunkerSocialState.user_id == user_id)
+    ).first()
+
+    screening_mid: str | None = None
+    if (
+        social is not None
+        and social.movie_screening_movie_id is not None
+        and social.movie_screening_started_at is not None
+    ):
+        screening_mid = social.movie_screening_movie_id
+
+    wrote_screening = False
+    if screening_mid is not None and social is not None:
+        subdir = movie_pixel_frames.asset_subdir_for_movie_id(screening_mid)
+        if subdir is not None:
+            frame_idx = (
+                int(social.movie_pixel_frame_index) % n_frames if n_frames >= 1 else 0
+            )
+            grid = movie_pixel_frames.movie_cells(subdir, frame_idx, cols_n, rows_n)
+            if grid is None:
+                frame = [[random.random() for _ in range(cols_n)] for _ in range(rows_n)]
+            else:
+                frame = [list(row) for row in grid]
+
+            for i in range(n_snapshots):
+                ts = tick_time - timedelta(seconds=(n_snapshots - 1 - i) * delta_s)
+                cells = [frame[r][i] for r in range(rows_n)]
+                db.session.add(
+                    SocialMoviePixelSample(
+                        user_id=user_id,
+                        movie_id=screening_mid,
+                        timestamp=ts,
+                        grid_cols=1,
+                        grid_rows=rows_n,
+                        cells=cells,
+                    )
+                )
+
+            if n_frames >= 1:
+                social.movie_pixel_frame_index = (
+                    int(social.movie_pixel_frame_index) + 1
+                ) % n_frames
+            wrote_screening = True
+
+    if not wrote_screening:
+        idle_mid = constants.SOCIAL_MOVIE_PIXEL_IDLE_HEATMAP_MOVIE_ID
+        for i in range(n_snapshots):
+            ts = tick_time - timedelta(seconds=(n_snapshots - 1 - i) * delta_s)
+            cells = [random.random() for _ in range(rows_n)]
+            db.session.add(
+                SocialMoviePixelSample(
+                    user_id=user_id,
+                    movie_id=idle_mid,
+                    timestamp=ts,
+                    grid_cols=1,
+                    grid_rows=rows_n,
+                    cells=cells,
+                )
+            )
 
 
 def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
@@ -231,6 +417,11 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
             selectinload(BunkerFarmingSystem.rat_trapper_line),
         )
     ).first()
+    theatre = db.session.scalars(
+        select(BunkerTheatreSystem)
+        .where(BunkerTheatreSystem.user_id == user_id)
+        .options(selectinload(BunkerTheatreSystem.profession_line))
+    ).first()
     idle_profession = db.session.scalars(
         select(BunkerProfession).where(
             BunkerProfession.user_id == user_id,
@@ -268,6 +459,7 @@ def fetch_game_tick_readings_for_user(user_id: str) -> GameTickReadings | None:
         lighting=lighting,
         power_crank=power_crank,
         farming=farming,
+        theatre=theatre,
         idle_profession=idle_profession,
         investigation_profession=investigation_profession,
         user=user_row,
@@ -339,11 +531,13 @@ def handle_boredom_and_doubt_tick(
     doubt_growth_max_per_second: float,
     initial_radiation: float,
     tick_time: datetime,
-) -> None:
+    boredom_relief: float = 0.0,
+) -> tuple[float, float]:
     new_boredom = min(
         100.0,
         latest_boredom_sample.boredom + boredom_per_second * elapsed_seconds,
     )
+    new_boredom = max(0.0, new_boredom - max(0.0, boredom_relief))
     denom = max(float(initial_radiation), 1e-9)
     doubt_factor = max(0.0, 1.0 - (new_radiation_truth / denom))
     new_doubt = min(
@@ -356,6 +550,7 @@ def handle_boredom_and_doubt_tick(
     db.session.add(
         BunkerDoubt(user_id=user_id, doubt=new_doubt, timestamp=tick_time)
     )
+    return (new_boredom, new_doubt)
 
 
 def handle_loyalty_change(
@@ -372,6 +567,178 @@ def handle_loyalty_change(
             new_loyalty - excess_crank_workers * loyalty_penalty_per_excess_crank_worker,
         )
     return new_loyalty
+
+
+def boredom_loyalty_drag(boredom: float, elapsed_seconds: float) -> float:
+    """Loyalty lost this tick from boredom (scaled 0 at boredom 0, full rate at 100)."""
+    scale = max(0.0, min(100.0, boredom)) / 100.0
+    return scale * float(constants.BOREDOM_LOYALTY_DRAIN_PER_SECOND_AT_FULL) * elapsed_seconds
+
+
+def movie_exhaustion_loyalty_drag(total_exhaustion: float, elapsed_seconds: float) -> float:
+    """Loyalty lost from screening fatigue (combined exhaustion; no drain until sum reaches 50)."""
+    capped = max(0.0, min(100.0, total_exhaustion))
+    if capped < 50.0:
+        return 0.0
+    scale = (capped - 50.0) / 50.0
+    return scale * float(constants.MOVIE_EXHAUSTION_LOYALTY_DRAIN_PER_SECOND_AT_FULL) * elapsed_seconds
+
+
+def complete_due_movie_screenings_for_user(user_id: str, tick_time: datetime) -> None:
+    """Apply boredom, doubt relief + exhaustion when a screening has finished its runtime."""
+    social = db.session.get(BunkerSocialState, user_id)
+    if social is None or social.movie_screening_movie_id is None:
+        return
+    started = social.movie_screening_started_at
+    if started is None:
+        return
+    duration = float(constants.MOVIE_SCREENING_DURATION_SECONDS)
+    age = (tick_time - started).total_seconds()
+    if age + 1e-9 < duration:
+        return
+
+    movie_id = social.movie_screening_movie_id
+    spec = constants.MOVIES_BY_ID.get(movie_id)
+    if spec is None:
+        social.movie_screening_movie_id = None
+        social.movie_screening_started_at = None
+        return
+
+    latest = db.session.scalars(
+        select(BunkerBoredom)
+        .where(BunkerBoredom.user_id == user_id)
+        .order_by(BunkerBoredom.timestamp.desc())
+        .limit(1)
+    ).first()
+    if latest is None:
+        social.movie_screening_movie_id = None
+        social.movie_screening_started_at = None
+        return
+
+    exh_row = db.session.get(PlayerMovieExhaustion, (user_id, movie_id))
+    if exh_row is None:
+        exh_row = PlayerMovieExhaustion(
+            user_id=user_id,
+            movie_id=movie_id,
+            exhaustion=0.0,
+            screenings_completed=0,
+            updated_at=tick_time,
+        )
+        db.session.add(exh_row)
+
+    k = float(constants.SOCIAL_MOVIE_DIMINISH_K)
+    uses = int(exh_row.screenings_completed)
+    relief = float(spec.boredom_relief_base) / (1.0 + k * uses)
+    new_boredom = max(0.0, float(latest.boredom) - relief)
+
+    latest_doubt = db.session.scalars(
+        select(BunkerDoubt)
+        .where(BunkerDoubt.user_id == user_id)
+        .order_by(BunkerDoubt.timestamp.desc())
+        .limit(1)
+    ).first()
+    doubt_written = False
+    if latest_doubt is not None:
+        doubt_relief_amt = float(spec.doubt_relief_base) / (1.0 + k * uses)
+        if doubt_relief_amt > 1e-12:
+            new_doubt = max(0.0, float(latest_doubt.doubt) - doubt_relief_amt)
+            db.session.add(
+                BunkerDoubt(user_id=user_id, doubt=new_doubt, timestamp=tick_time)
+            )
+            doubt_written = True
+
+    gain = float(constants.MOVIE_EXHAUSTION_GAIN_PER_PLAY)
+    exh_row.exhaustion = float(exh_row.exhaustion) + gain
+    exh_row.screenings_completed = uses + 1
+    exh_row.updated_at = tick_time
+
+    social.movie_screening_movie_id = None
+    social.movie_screening_started_at = None
+
+    db.session.add(BunkerBoredom(user_id=user_id, boredom=new_boredom, timestamp=tick_time))
+    log.info(
+        "movie screening complete: user=%s movie=%s boredom %.2f→%.2f doubt_written=%s ex_gain=%.1f",
+        user_id,
+        movie_id,
+        latest.boredom,
+        new_boredom,
+        doubt_written,
+        gain,
+    )
+
+
+def decay_player_movie_exhaustion(
+    user_id: str, elapsed_seconds: float, tick_time: datetime
+) -> float:
+    """Decay each title's exhaustion; drop negligible rows. Returns sum after decay."""
+    rows = db.session.scalars(
+        select(PlayerMovieExhaustion).where(PlayerMovieExhaustion.user_id == user_id)
+    ).all()
+    decay_rate = float(constants.MOVIE_EXHAUSTION_DECAY_PER_SECOND)
+    total = 0.0
+    for row in rows:
+        row.exhaustion = max(0.0, row.exhaustion - decay_rate * elapsed_seconds)
+        row.updated_at = tick_time
+        if row.exhaustion < 1e-6:
+            if int(row.screenings_completed) > 0:
+                row.exhaustion = 0.0
+                row.updated_at = tick_time
+            else:
+                db.session.delete(row)
+        else:
+            total += row.exhaustion
+    return total
+
+
+def handle_theatre_tick(
+    theatre: BunkerTheatreSystem,
+    actor_count: int,
+    tick_time: datetime,
+    energy_level: float,
+) -> tuple[float, float]:
+    """Returns (power_draw_per_second, loyalty_bonus_this_tick). Mutates ``theatre``."""
+    tw = float(constants.THEATRE_WRITE_SECONDS)
+    tr = float(constants.THEATRE_REHEARSE_SECONDS)
+    interval = float(constants.THEATRE_PERFORMANCE_INTERVAL_SECONDS)
+    draw_per = float(constants.THEATRE_POWER_DRAW_PER_ACTOR)
+
+    if actor_count <= 0:
+        theatre.phase = constants.THEATRE_PHASE_IDLE
+        theatre.next_performance_at = None
+        theatre.phase_entered_at = tick_time
+        theatre.updated_at = tick_time
+        return (0.0, 0.0)
+
+    draw_ps = draw_per * float(actor_count)
+    can_progress = energy_level > 1e-9
+
+    if theatre.phase == constants.THEATRE_PHASE_IDLE:
+        theatre.phase = constants.THEATRE_PHASE_WRITING
+        theatre.phase_entered_at = tick_time
+        theatre.next_performance_at = None
+
+    loyalty_bonus = 0.0
+
+    if can_progress:
+        phase_age = (tick_time - theatre.phase_entered_at).total_seconds()
+
+        if theatre.phase == constants.THEATRE_PHASE_WRITING:
+            if phase_age >= tw:
+                theatre.phase = constants.THEATRE_PHASE_REHEARSING
+                theatre.phase_entered_at = tick_time
+        elif theatre.phase == constants.THEATRE_PHASE_REHEARSING:
+            if phase_age >= tr:
+                theatre.phase = constants.THEATRE_PHASE_READY
+                theatre.phase_entered_at = tick_time
+                theatre.next_performance_at = tick_time + timedelta(seconds=interval)
+        elif theatre.phase == constants.THEATRE_PHASE_READY:
+            nxt = theatre.next_performance_at
+            if nxt is not None and tick_time >= nxt:
+                loyalty_bonus = float(constants.THEATRE_LOYALTY_PER_PERFORMANCE)
+                theatre.next_performance_at = tick_time + timedelta(seconds=interval)
+
+    theatre.updated_at = tick_time
+    return (draw_ps, loyalty_bonus)
 
 
 def user_had_prior_departure_event(user_id: str) -> bool:
@@ -429,30 +796,41 @@ def normalize_worker_assignments(
     crank_line: BunkerProfession | None,
     farm_line: BunkerProfession | None,
     rat_trapper_line: BunkerProfession | None,
+    theatre_line: BunkerProfession | None,
     idle_line: BunkerProfession | None,
     investigation_line: BunkerProfession | None,
     population_cap: int,
     tick_time: datetime,
 ) -> None:
-    """Clamp crank, farm, rat trappers to shared pool minus Investigation; refresh Idle."""
+    """Clamp crank, farm, rat trappers, theatre to shared pool minus Investigation; refresh Idle."""
     inv_n = investigation_line.count if investigation_line is not None else 0
     inv_n = max(0, inv_n)
     pool = max(0, population_cap - inv_n)
-    if crank_line is None or farm_line is None or rat_trapper_line is None:
+    if crank_line is None or farm_line is None or rat_trapper_line is None or theatre_line is None:
         return
     crank_line.count = max(0, min(crank_line.count, pool))
     farm_line.count = max(0, min(farm_line.count, pool))
     rat_trapper_line.count = max(0, min(rat_trapper_line.count, pool))
-    while crank_line.count + farm_line.count + rat_trapper_line.count > pool:
+    theatre_line.count = max(0, min(theatre_line.count, pool))
+    while (
+        crank_line.count
+        + farm_line.count
+        + rat_trapper_line.count
+        + theatre_line.count
+        > pool
+    ):
         if farm_line.count > 0:
             farm_line.count -= 1
         elif rat_trapper_line.count > 0:
             rat_trapper_line.count -= 1
+        elif theatre_line.count > 0:
+            theatre_line.count -= 1
         else:
             crank_line.count -= 1
     crank_line.updated_at = tick_time
     farm_line.updated_at = tick_time
     rat_trapper_line.updated_at = tick_time
+    theatre_line.updated_at = tick_time
     if idle_line is not None:
         idle_line.count = max(
             0,
@@ -460,6 +838,7 @@ def normalize_worker_assignments(
             - crank_line.count
             - farm_line.count
             - rat_trapper_line.count
+            - theatre_line.count
             - inv_n,
         )
         idle_line.updated_at = tick_time
@@ -471,20 +850,22 @@ def record_bunker_profession_snapshots(
     readings: GameTickReadings,
     tick_time: datetime,
 ) -> None:
-    """Append profession rows (crank, farming, investigation, idle) for Grafana."""
+    """Append profession rows (crank, farming, theatre, investigation, idle) for Grafana."""
     crank = _crank_worker_count(readings)
     farm = _farm_worker_count(readings)
     rat_n = _rat_trapper_count(readings)
+    theatre_n = _theatre_worker_count(readings)
     inv = _investigation_worker_count(readings)
     idle_count = (
         readings.idle_profession.count
         if readings.idle_profession is not None
-        else max(0, population - crank - farm - rat_n - inv)
+        else max(0, population - crank - farm - rat_n - theatre_n - inv)
     )
     for profession, count in (
         (PROFESSION_POWER_CRANK, crank),
         (PROFESSION_FARMING, farm),
         (PROFESSION_RAT_TRAPPING, rat_n),
+        (PROFESSION_THEATRE, theatre_n),
         (PROFESSION_INVESTIGATION, inv),
         (PROFESSION_IDLE, idle_count),
     ):
@@ -574,9 +955,12 @@ def handle_energy_reserve_change(
     elapsed_seconds: float,
     lights_power_draw_per_second: float,
     crank_power_per_worker_per_second: float,
+    theatre_draw_per_second: float,
     tick_time: datetime,
 ) -> None:
-    power_draw = lights_power_draw_per_second if lights_on else 0.0
+    power_draw = (
+        lights_power_draw_per_second if lights_on else 0.0
+    ) + max(0.0, theatre_draw_per_second)
     generation_power = crank_workers * crank_power_per_worker_per_second
     new_energy_level = max(
         0.0,
@@ -646,11 +1030,15 @@ def game_tick(app: Flask) -> None:
         if not users:
             return
 
+        bad_apple_frame_idx = advance_bad_apple_frame_index()
+
         processed_user_count = 0
         gamestate_snapshots: list[dict[str, object]] = []
         gs_interval = float(constants.GAMESTATE_LOG_INTERVAL_SECONDS)
         for user in users:
             user_id = user.id
+
+            complete_due_movie_screenings_for_user(user_id, tick_time)
 
             readings = fetch_game_tick_readings_for_user(user_id)
             if readings is None:
@@ -695,7 +1083,24 @@ def game_tick(app: Flask) -> None:
                 elapsed_seconds,
                 decay_half_life_seconds,
             )
-            handle_boredom_and_doubt_tick(
+            exhaust_sum = decay_player_movie_exhaustion(
+                user_id, elapsed_seconds, tick_time
+            )
+
+            usr = readings.user
+            sermon_loyalty_bonus = 0.0
+            sermon_boredom_relief = 0.0
+            if (
+                usr.sermon_reward_pending
+                and usr.sermon_busy_until is not None
+                and tick_time >= usr.sermon_busy_until
+            ):
+                sermon_loyalty_bonus = float(constants.SERMON_COMPLETION_LOYALTY_GAIN)
+                sermon_boredom_relief = float(constants.SERMON_COMPLETION_BOREDOM_RELIEF)
+                usr.sermon_reward_pending = False
+                usr.sermon_busy_until = None
+
+            new_boredom, _ = handle_boredom_and_doubt_tick(
                 user_id,
                 readings.latest_boredom_sample,
                 readings.latest_doubt_sample,
@@ -705,6 +1110,7 @@ def game_tick(app: Flask) -> None:
                 doubt_growth_max_per_second,
                 initial_radiation,
                 tick_time,
+                boredom_relief=sermon_boredom_relief,
             )
 
             adjusted_loyalty = handle_loyalty_change(
@@ -712,6 +1118,12 @@ def game_tick(app: Flask) -> None:
                 _crank_worker_count(readings),
                 crank_workers_loyalty_threshold,
                 loyalty_penalty_per_excess_crank_worker,
+            )
+            adjusted_loyalty = max(
+                0.0,
+                adjusted_loyalty
+                - boredom_loyalty_drag(new_boredom, elapsed_seconds)
+                - movie_exhaustion_loyalty_drag(exhaust_sum, elapsed_seconds),
             )
 
             had_prior_departure_event = user_had_prior_departure_event(user_id)
@@ -743,11 +1155,19 @@ def game_tick(app: Flask) -> None:
                 if readings.farming is not None
                 else None
             )
+            theatre_line = (
+                readings.theatre.profession_line
+                if readings.theatre is not None
+                else None
+            )
+            theatre_draw_ps = 0.0
+            theatre_loyalty_bonus = 0.0
             if _facilities_ready(readings):
                 normalize_worker_assignments(
                     crank_line,
                     farm_line,
                     rat_line,
+                    theatre_line,
                     readings.idle_profession,
                     readings.investigation_profession,
                     post_pop,
@@ -763,9 +1183,23 @@ def game_tick(app: Flask) -> None:
                     readings.power_crank.updated_at = tick_time
                 if readings.farming is not None:
                     readings.farming.updated_at = tick_time
+                if readings.theatre is not None:
+                    en_lvl = (
+                        readings.latest_energy_reserve.level
+                        if readings.latest_energy_reserve is not None
+                        else 0.0
+                    )
+                    theatre_draw_ps, theatre_loyalty_bonus = handle_theatre_tick(
+                        readings.theatre,
+                        _theatre_worker_count(readings),
+                        tick_time,
+                        en_lvl,
+                    )
             record_bunker_profession_snapshots(
                 user_id, post_pop, readings, tick_time
             )
+            record_environment_pixel_noise_sample(user_id, tick_time, bad_apple_frame_idx)
+            record_social_movie_pixel_sample(user_id, tick_time)
 
             deliver_pending_narrative_messages(
                 NarrativeContext(
@@ -786,6 +1220,7 @@ def game_tick(app: Flask) -> None:
                     elapsed_seconds,
                     lights_power_draw_per_second,
                     crank_power_per_worker_per_second,
+                    theatre_draw_ps,
                     tick_time,
                 )
 
@@ -824,7 +1259,16 @@ def game_tick(app: Flask) -> None:
                     rat_background_consumption_ps=rat_bg_consume,
                 )
 
-            final_loyalty = max(0.0, min(100.0, adjusted_loyalty + auto_loyalty_adj))
+            final_loyalty = max(
+                0.0,
+                min(
+                    100.0,
+                    adjusted_loyalty
+                    + auto_loyalty_adj
+                    + sermon_loyalty_bonus
+                    + theatre_loyalty_bonus,
+                ),
+            )
             record_loyalty_sample(user_id, final_loyalty, tick_time)
 
             ev_active = player_has_any_active_event(user_id)

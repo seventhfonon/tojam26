@@ -84,7 +84,8 @@ class GameEventSpec:
 
     definition: EventDefinition
     spawn_chance_per_tick: float
-    duration_seconds: int
+    #: ``None`` — no timer; cleared only via ``player_resolve`` (investigation on matching ``system``).
+    duration_seconds: int | None
     #: Simulation deltas for each tick while the active row exists (may vary by user/time).
     tick_effects: Callable[[str, datetime], EventTickEffects]
     #: ``True`` iff this event may attempt RNG this tick (thresholds, suppression, etc.).
@@ -99,6 +100,8 @@ class GameEventSpec:
     on_spawn: Callable[[str, datetime], None]
     #: When set, ties this event to a bunker subsystem (see ``GAME_SYSTEM_IDS``).
     system: str | None = None
+    #: Optional side effects after ``player_resolve`` (same transaction as messages).
+    on_player_resolve: Callable[[str, datetime], None] | None = None
 
 
 def rats_spike_marginal_food_consumption_per_second(population: int) -> float:
@@ -179,6 +182,12 @@ def _rats_silo_intro_player_resolve(_user_id: str, _tick_time: datetime) -> Even
     )
 
 
+def _rats_silo_intro_after_player_resolve(user_id: str, _tick_time: datetime) -> None:
+    user_row = db.session.get(User, user_id)
+    if user_row is not None:
+        user_row.rat_trappers_unlocked = True
+
+
 def _rats_silo_intro_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
     return (
         "RATS! Grain-room telemetry flagged vibration behind the inner jacket — "
@@ -234,7 +243,7 @@ REGISTERED_EVENTS: tuple[GameEventSpec, ...] = (
     GameEventSpec(
         definition=EventDefinition.RATS_SILO_INTRO,
         spawn_chance_per_tick=0.01,
-        duration_seconds=50,
+        duration_seconds=None,
         tick_effects=_rats_silo_intro_tick_effects,
         can_spawn=_can_spawn_rats_silo_intro,
         auto_resolve=_rats_silo_intro_auto_resolve,
@@ -242,6 +251,7 @@ REGISTERED_EVENTS: tuple[GameEventSpec, ...] = (
         spawn_announcement=_rats_silo_intro_spawn_announce,
         on_spawn=_rats_silo_intro_on_spawn,
         system="farming",
+        on_player_resolve=_rats_silo_intro_after_player_resolve,
     ),
     GameEventSpec(
         definition=EventDefinition.RATS_SILO,
@@ -416,6 +426,8 @@ def finalize_investigation_if_due(user_id: str, tick_time: datetime) -> float:
             return 0.0
 
         outcome = spec.player_resolve(user_id, tick_time)
+        if spec.on_player_resolve is not None:
+            spec.on_player_resolve(user_id, tick_time)
         delta = float(outcome.loyalty_delta)
         db.session.add(
             SystemMessage(
@@ -462,6 +474,7 @@ def auto_resolve_if_due(user_id: str, tick_time: datetime) -> float:
         db.session.scalars(
             select(PlayerActiveEvent).where(
                 PlayerActiveEvent.user_id == user_id,
+                PlayerActiveEvent.auto_resolve_at.is_not(None),
                 PlayerActiveEvent.auto_resolve_at <= tick_time,
             )
         ).all()
@@ -520,13 +533,18 @@ def try_spawn_event(
         if random.random() >= chance:
             continue
 
-        duration_s = int(spec.duration_seconds)
+        deadline: datetime | None
+        if spec.duration_seconds is None:
+            deadline = None
+        else:
+            duration_s = int(spec.duration_seconds)
+            deadline = tick_time + timedelta(seconds=duration_s)
         db.session.add(
             PlayerActiveEvent(
                 user_id=user_id,
                 kind=spec.definition,
                 started_at=tick_time,
-                auto_resolve_at=tick_time + timedelta(seconds=duration_s),
+                auto_resolve_at=deadline,
                 system=spec.system,
             )
         )
@@ -544,7 +562,7 @@ def try_spawn_event(
             "event spawned: user=%s definition=%s duration_s=%s",
             user_id,
             spec.definition,
-            duration_s,
+            spec.duration_seconds,
         )
 
 
@@ -560,6 +578,8 @@ def try_dispatch_investigation(user_id: str, system: str, when: datetime) -> boo
 
     user = db.session.get(User, user_id)
     if user is None:
+        return False
+    if user.sermon_busy_until is not None and when < user.sermon_busy_until:
         return False
     if user.investigation_busy_until is not None and when < user.investigation_busy_until:
         return False
@@ -586,7 +606,7 @@ def try_dispatch_investigation(user_id: str, system: str, when: datetime) -> boo
     user.investigation_target_system = system_id
 
     for ev_row in active_events_for_user(user_id):
-        if busy_until > ev_row.auto_resolve_at:
+        if ev_row.auto_resolve_at is None or busy_until > ev_row.auto_resolve_at:
             ev_row.auto_resolve_at = busy_until
 
     subsystem_lbl = GAME_SYSTEM_LABELS.get(system_id, system_id)
@@ -641,8 +661,18 @@ def investigation_dispatch_status_payload(
         and user.investigation_busy_until is not None
         and now < user.investigation_busy_until
     )
+    sermon_locked = (
+        user is not None
+        and user.sermon_busy_until is not None
+        and now < user.sermon_busy_until
+    )
     need = int(cfg.team_size)
-    can_dispatch = user is not None and not deployed and idle_n >= need
+    can_dispatch = (
+        user is not None
+        and not deployed
+        and not sermon_locked
+        and idle_n >= need
+    )
     return {
         "can_dispatch": can_dispatch,
         "team_deployed": deployed,

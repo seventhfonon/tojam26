@@ -6,20 +6,22 @@
     "game"
   ],
   "schemaVersion": 39,
-  "version": 10,
+  "version": 31,
   "editable": true,
   "graphTooltip": 1,
   "time": {
     "from": "now-15m",
     "to": "now"
   },
-  "refresh": "10s",
+  "refresh": "2s",
   "timepicker": {
     "refresh_intervals": [
+      "1s",
+      "2s",
+      "5s",
       "10s",
       "30s",
-      "1m",
-      "5m"
+      "1m"
     ]
   },
   "templating": {
@@ -36,6 +38,26 @@
         "options": [],
         "hide": 2,
         "skipUrlSync": false
+      },
+      {
+        "name": "heatmap_history_seconds",
+        "type": "constant",
+        "label": "Heatmap history window (seconds)",
+        "query": "900",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "900",
+          "value": "900"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "900",
+            "value": "900"
+          }
+        ],
+        "skipUrlSync": true
       }
     ]
   },
@@ -53,7 +75,7 @@
       },
       "options": {
         "mode": "html",
-        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\u2622&nbsp; Environment</span><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-social?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc65&nbsp; Social&nbsp;\u2197</a></div>"
+        "content": "<style id=\"silo-env-heatmap-hide-axis-labels\">\n[data-panelid=\"27\"] .u-axis text,\n[data-panelid=\"27\"] .u-axis .u-value,\n[data-panel-id=\"27\"] .u-axis text,\n[data-panel-id=\"27\"] .u-axis .u-value {\n  display: none !important;\n}\n</style>\n<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<script>\n(function siloSquareHeatmapPanel27() {\n  function findPanels() {\n    var roots = [];\n    ['[data-panelid=\"27\"]', '[data-panel-id=\"27\"]'].forEach(function(sel) {\n      document.querySelectorAll(sel).forEach(function(el) {\n        if (roots.indexOf(el) === -1) roots.push(el);\n      });\n    });\n    if (!roots.length) {\n      document.querySelectorAll('section[aria-label*=\"Sensor field\"]').forEach(function(el) {\n        roots.push(el);\n      });\n    }\n    return roots;\n  }\n\n  function tick() {\n    findPanels().forEach(function(root) {\n      var uplot = root.querySelector('.uplot');\n      if (!uplot) return;\n\n      var inner = root.querySelector('[data-testid*=\"panel-content\"]')\n        || root.querySelector('[data-testid*=\"Panel content\"]')\n        || root.querySelector('[class*=\"panel-content\"]')\n        || root;\n\n      var box = inner.getBoundingClientRect();\n      var rawW = Math.max(box.width - 28, 80);\n      var rawH = Math.max(box.height - 28, 80);\n      var S = Math.floor(Math.min(rawW, rawH));\n      if (S < 80) return;\n\n      var sx = S / rawW;\n      var sy = S / rawH;\n\n      var clip = uplot.closest('[data-testid*=\"viz-layout\"]') || uplot.parentElement;\n      if (!clip) return;\n\n      clip.style.setProperty('overflow', 'hidden', 'important');\n      clip.style.setProperty('width', S + 'px', 'important');\n      clip.style.setProperty('height', S + 'px', 'important');\n      clip.style.setProperty('margin-left', 'auto', 'important');\n      clip.style.setProperty('margin-right', 'auto', 'important');\n      clip.style.setProperty('box-sizing', 'border-box', 'important');\n\n      uplot.style.transformOrigin = 'top left';\n      uplot.style.setProperty('transform', 'scale(' + sx + ',' + sy + ')', 'important');\n    });\n    requestAnimationFrame(tick);\n  }\n\n  requestAnimationFrame(tick);\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\u2622&nbsp; Environment</span><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-social?var-user_id=${user_id}&kiosk=tv\" target=\"_blank\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc65&nbsp; Social&nbsp;\u2197</a></div>"
       }
     },
     {
@@ -80,13 +102,97 @@
       "gridPos": {
         "x": 0,
         "y": 8,
-        "w": 24,
-        "h": 3
+        "w": 10,
+        "h": 16
       },
       "options": {
         "mode": "html",
         "content": "<style>\n.silo-btn { display: inline-block; padding: 11px 22px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 14px; letter-spacing: 0.4px; font-family: Inter, sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: opacity 0.15s; color: #fff; }\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--orange { background: #e67e00; }\n</style>\n<script>\nfunction _siloEnvSyncInvestigateBtn() {\n  var btn = document.getElementById('_silo_env_investigate_btn');\n  var hint = document.getElementById('_silo_env_inv_hint');\n  if (!btn) return;\n  fetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}&system=environment')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      btn.disabled = !d.can_dispatch;\n      if (hint) hint.textContent = 'Requires ' + d.team_required + ' idle residents (unassigned to crank, farm, or sweep).';\n    })\n    .catch(function() { btn.disabled = true; });\n}\nfunction siloEnvAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloEnvSyncInvestigateBtn();\n  }, 600);\n}\n_siloEnvSyncInvestigateBtn();\nsetInterval(_siloEnvSyncInvestigateBtn, 2000);\n</script>\n<div style=\"padding: 14px 18px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <p style=\"margin:0 0 10px; color:#c9a227; font-size:13px; font-weight:600;\">Routine compartment sweep</p>\n  <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_env_investigate_btn\" disabled onclick=\"siloEnvAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=environment')\">Send investigation team</button>\n  <p id=\"_silo_env_inv_hint\" style=\"margin:10px 0 0; color:#666; font-size:11px;\"></p>\n</div>"
       }
+    },
+    {
+      "id": 27,
+      "type": "heatmap",
+      "title": "Sensor field (reference)",
+      "description": "48x48 pixel display: **time** on the horizontal axis (48 backfilled timestamps). Each DB row holds one strip (`cells`, length 48). Values come from ``app/static/environment_pixel_reference.png`` luminance (uniform noise fallback if the image or Pillow is unavailable); optional tick jitter in ``ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE``. Query pivots to wide heatmap columns **0**-**47**. **Calculate from data** is off. The header script fits panel **27** to a square viewport and applies **non-uniform scale** so each heatmap cell stays square (Grafana sizes uPlot from panel width/height, which stretches pixels horizontally). Uses hidden `heatmap_history_seconds` (900), aligned with `ENVIRONMENT_PIXEL_BACKFILL_SPAN_SECONDS` in `app/constants.py`. Axis tick **labels** are off: **Y** via `yAxis.axisPlacement: hidden`, **X** (time) via CSS in the top Text panel.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 8,
+        "w": 14,
+        "h": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "cellValues": {},
+        "color": {
+          "mode": "scheme",
+          "scheme": "Turbo",
+          "fill": "dark-orange",
+          "reverse": false,
+          "exponent": 0.5,
+          "scale": "linear",
+          "steps": 64,
+          "min": 0,
+          "max": 1
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "legend": {
+          "show": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": true,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisPlacement": "hidden",
+          "reverse": true,
+          "decimals": 0
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH in_range AS (\n  SELECT timestamp, cells::jsonb AS ja\n  FROM environment_pixel_noise_samples\n  WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid\n    AND timestamp <= NOW()\n    AND timestamp >= NOW() - (($heatmap_history_seconds)::double precision * INTERVAL '1 second')\n),\nstrip AS (\n  SELECT ir.timestamp,\n         (r.ord - 1)::int AS row_idx,\n         (r.cell_val #>> '{}')::double precision AS val\n  FROM in_range ir\n  CROSS JOIN LATERAL jsonb_array_elements(ir.ja) WITH ORDINALITY AS r(cell_val, ord)\n)\nSELECT\n  timestamp AS time,\n         MAX(val) FILTER (WHERE row_idx = 0) AS \"0\",\n         MAX(val) FILTER (WHERE row_idx = 1) AS \"1\",\n         MAX(val) FILTER (WHERE row_idx = 2) AS \"2\",\n         MAX(val) FILTER (WHERE row_idx = 3) AS \"3\",\n         MAX(val) FILTER (WHERE row_idx = 4) AS \"4\",\n         MAX(val) FILTER (WHERE row_idx = 5) AS \"5\",\n         MAX(val) FILTER (WHERE row_idx = 6) AS \"6\",\n         MAX(val) FILTER (WHERE row_idx = 7) AS \"7\",\n         MAX(val) FILTER (WHERE row_idx = 8) AS \"8\",\n         MAX(val) FILTER (WHERE row_idx = 9) AS \"9\",\n         MAX(val) FILTER (WHERE row_idx = 10) AS \"10\",\n         MAX(val) FILTER (WHERE row_idx = 11) AS \"11\",\n         MAX(val) FILTER (WHERE row_idx = 12) AS \"12\",\n         MAX(val) FILTER (WHERE row_idx = 13) AS \"13\",\n         MAX(val) FILTER (WHERE row_idx = 14) AS \"14\",\n         MAX(val) FILTER (WHERE row_idx = 15) AS \"15\",\n         MAX(val) FILTER (WHERE row_idx = 16) AS \"16\",\n         MAX(val) FILTER (WHERE row_idx = 17) AS \"17\",\n         MAX(val) FILTER (WHERE row_idx = 18) AS \"18\",\n         MAX(val) FILTER (WHERE row_idx = 19) AS \"19\",\n         MAX(val) FILTER (WHERE row_idx = 20) AS \"20\",\n         MAX(val) FILTER (WHERE row_idx = 21) AS \"21\",\n         MAX(val) FILTER (WHERE row_idx = 22) AS \"22\",\n         MAX(val) FILTER (WHERE row_idx = 23) AS \"23\",\n         MAX(val) FILTER (WHERE row_idx = 24) AS \"24\",\n         MAX(val) FILTER (WHERE row_idx = 25) AS \"25\",\n         MAX(val) FILTER (WHERE row_idx = 26) AS \"26\",\n         MAX(val) FILTER (WHERE row_idx = 27) AS \"27\",\n         MAX(val) FILTER (WHERE row_idx = 28) AS \"28\",\n         MAX(val) FILTER (WHERE row_idx = 29) AS \"29\",\n         MAX(val) FILTER (WHERE row_idx = 30) AS \"30\",\n         MAX(val) FILTER (WHERE row_idx = 31) AS \"31\",\n         MAX(val) FILTER (WHERE row_idx = 32) AS \"32\",\n         MAX(val) FILTER (WHERE row_idx = 33) AS \"33\",\n         MAX(val) FILTER (WHERE row_idx = 34) AS \"34\",\n         MAX(val) FILTER (WHERE row_idx = 35) AS \"35\",\n         MAX(val) FILTER (WHERE row_idx = 36) AS \"36\",\n         MAX(val) FILTER (WHERE row_idx = 37) AS \"37\",\n         MAX(val) FILTER (WHERE row_idx = 38) AS \"38\",\n         MAX(val) FILTER (WHERE row_idx = 39) AS \"39\",\n         MAX(val) FILTER (WHERE row_idx = 40) AS \"40\",\n         MAX(val) FILTER (WHERE row_idx = 41) AS \"41\",\n         MAX(val) FILTER (WHERE row_idx = 42) AS \"42\",\n         MAX(val) FILTER (WHERE row_idx = 43) AS \"43\",\n         MAX(val) FILTER (WHERE row_idx = 44) AS \"44\",\n         MAX(val) FILTER (WHERE row_idx = 45) AS \"45\",\n         MAX(val) FILTER (WHERE row_idx = 46) AS \"46\",\n         MAX(val) FILTER (WHERE row_idx = 47) AS \"47\"\nFROM strip\nGROUP BY timestamp\nORDER BY timestamp"
+        }
+      ],
+      "timeFrom": "15m",
+      "timeTo": null,
+      "timeShift": null
     },
     {
       "id": 2,
@@ -99,7 +205,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 11,
+        "y": 24,
         "w": 24,
         "h": 10
       },
@@ -173,7 +279,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 21,
+        "y": 34,
         "w": 8,
         "h": 5
       },
@@ -243,7 +349,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 21,
+        "y": 34,
         "w": 8,
         "h": 5
       },
@@ -313,7 +419,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 21,
+        "y": 34,
         "w": 8,
         "h": 5
       },
@@ -384,7 +490,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 26,
+        "y": 39,
         "w": 8,
         "h": 8
       },
@@ -456,7 +562,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 47,
         "w": 24,
         "h": 9
       },
@@ -514,7 +620,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 43,
+        "y": 56,
         "w": 12,
         "h": 10
       },
@@ -610,7 +716,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 43,
+        "y": 56,
         "w": 12,
         "h": 10
       },

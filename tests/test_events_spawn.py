@@ -9,7 +9,12 @@ from uuid import uuid4
 import pytest
 
 from app import constants
-from app.events import EVENTS_BY_DEFINITION, EventDefinition, try_spawn_event
+from app.events import (
+    EVENTS_BY_DEFINITION,
+    EventDefinition,
+    _rats_silo_intro_after_player_resolve,
+    try_spawn_event,
+)
 from app.models import PlayerActiveEvent, SystemMessage, User
 
 
@@ -65,7 +70,7 @@ def test_try_spawn_event_intro_first_visit_when_eligible_and_roll_succeeds():
     assert row.user_id == uid
     assert row.kind == EventDefinition.RATS_SILO_INTRO
     assert row.started_at == tick
-    assert row.auto_resolve_at == tick + timedelta(seconds=spec.duration_seconds)
+    assert row.auto_resolve_at is None
     assert row.system == spec.system
 
     msgs = [o for o in captured if isinstance(o, SystemMessage)]
@@ -159,7 +164,7 @@ def test_try_spawn_skips_kind_already_present():
         user_id=uid,
         kind=EventDefinition.RATS_SILO_INTRO,
         started_at=tick,
-        auto_resolve_at=tick + timedelta(seconds=50),
+        auto_resolve_at=None,
         system="farming",
     )
     captured: list[object] = [existing]
@@ -192,6 +197,20 @@ def test_try_spawn_skips_kind_already_present():
         and str(o.kind) == EventDefinition.RATS_SILO_INTRO.value
     ]
     assert len(intros) == 1
+
+
+def test_intro_after_player_resolve_sets_rat_trappers_unlocked():
+    uid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    tick = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
+    user_row = MagicMock()
+    user_row.rat_trappers_unlocked = False
+    mock_session = MagicMock()
+    mock_session.get.return_value = user_row
+
+    with patch("app.events.db.session", mock_session):
+        _rats_silo_intro_after_player_resolve(uid, tick)
+
+    assert user_row.rat_trappers_unlocked is True
 
 
 def test_try_spawn_event_rats_suppressed_when_trapper_output_covers_margin():
