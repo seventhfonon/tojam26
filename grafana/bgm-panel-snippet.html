@@ -1,11 +1,17 @@
 <!--
   Paste into Grafana Text panel (HTML mode) options.content, OR run:
     python scripts/embed_grafana_bgm.py
-  Template vars (hidden constants on each dashboard): ${bgm_url}, ${dashboard_uid}
+  Template vars (hidden constants on each dashboard): ${bgm_url},
+  ${sfx_button_click_url}, ${dashboard_uid}
+
+  SFX: native <button> and input[type=button|submit] play buttonClick by default.
+  Tab nav uses <a> links, not buttons — no click SFX unless you add role=button or
+  call window.__SILO_SFX__.play(...). Per-control: data-sfx="<id>" or data-sfx="none".
 
   Embedded in the Silo Command nav row by embed_grafana_bgm.py (right-aligned).
   Playback pauses when the browser tab is hidden (visibility API) or when you
-  navigate to another dashboard (singleton).
+  navigate to another dashboard (singleton). Same track URL reuses the existing
+  Audio instance when Grafana remounts the nav panel so BGM does not restart.
 -->
 <style>
 .silo-bgm-bar {
@@ -60,35 +66,38 @@
   }
 
   var LS_KEY = 'silo_bgm_enabled';
+
+  var prev = window.__SILO_BGM__;
+  if (prev && prev.trackUrl === TRACK && prev.audio && typeof prev.remount === 'function') {
+    prev.dash = DASH;
+    prev.remount(wrap, btn, statusEl);
+    return;
+  }
+
+  if (prev && typeof prev.destroy === 'function') {
+    prev.destroy();
+  }
+
   var audio = new Audio(TRACK);
   audio.loop = true;
   audio.volume = 0.35;
 
+  var navBtn = null;
+  var navStatus = null;
+
   function teardown() {
-    document.removeEventListener('visibilitychange', onVis);
+    if (api._onVis) {
+      document.removeEventListener('visibilitychange', api._onVis);
+    }
+    if (navBtn && api._onBtnClick) {
+      navBtn.removeEventListener('click', api._onBtnClick);
+    }
     try {
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
     } catch (e) {}
   }
-
-  var api = {
-    dash: DASH,
-    destroy: function () {
-      teardown();
-      if (window.__SILO_BGM__ === api) {
-        window.__SILO_BGM__ = null;
-      }
-    },
-    audio: audio,
-  };
-
-  var prev = window.__SILO_BGM__;
-  if (prev && typeof prev.destroy === 'function') {
-    prev.destroy();
-  }
-  window.__SILO_BGM__ = api;
 
   function onVis() {
     if (document.hidden) {
@@ -106,32 +115,165 @@
     var p = audio.play();
     if (p !== undefined && typeof p.then === 'function') {
       p.then(function () {
-        if (btn) btn.style.display = 'none';
-        if (statusEl) statusEl.textContent = 'Playing';
+        if (navBtn) navBtn.style.display = 'none';
+        if (navStatus) navStatus.textContent = 'Playing';
       }).catch(function () {
-        if (btn) btn.style.display = '';
-        if (statusEl && !fromUser) {
-          statusEl.textContent = 'Tap Enable to play';
+        if (navBtn) navBtn.style.display = '';
+        if (navStatus && !fromUser) {
+          navStatus.textContent = 'Tap Enable to play';
         }
       });
     }
   }
 
-  document.addEventListener('visibilitychange', onVis);
+  function remount(wrapEl, btnEl, statusElEl) {
+    if (navBtn && api._onBtnClick) {
+      navBtn.removeEventListener('click', api._onBtnClick);
+    }
+    navBtn = btnEl;
+    navStatus = statusElEl;
+    if (btnEl) {
+      btnEl.addEventListener('click', api._onBtnClick);
+    }
+    if (!audio.paused) {
+      if (btnEl) btnEl.style.display = 'none';
+      if (statusElEl) statusElEl.textContent = 'Playing';
+    } else {
+      if (btnEl) btnEl.style.display = '';
+      if (statusElEl && !document.hidden) {
+        try {
+          if (localStorage.getItem(LS_KEY) === '1') {
+            statusElEl.textContent = 'Tap Enable to play';
+          } else {
+            statusElEl.textContent = 'Optional bunker audio';
+          }
+        } catch (e) {
+          statusElEl.textContent = 'Optional bunker audio';
+        }
+      }
+    }
+  }
 
-  if (btn) {
-    btn.addEventListener('click', function () {
+  var api = {
+    dash: DASH,
+    trackUrl: TRACK,
+    destroy: function () {
+      teardown();
+      if (window.__SILO_BGM__ === api) {
+        window.__SILO_BGM__ = null;
+      }
+    },
+    audio: audio,
+    remount: remount,
+    _onVis: onVis,
+    _onBtnClick: function () {
       try {
         localStorage.setItem(LS_KEY, '1');
       } catch (e) {}
       tryPlay(true);
-    });
-  }
+    },
+  };
+
+  window.__SILO_BGM__ = api;
+
+  document.addEventListener('visibilitychange', onVis);
+
+  remount(wrap, btn, statusEl);
 
   try {
     if (localStorage.getItem(LS_KEY) === '1') {
       tryPlay(false);
     }
   } catch (e) {}
+})();
+</script>
+<script>
+(function siloDashSfx() {
+  var urls = {
+    buttonClick: ('${sfx_button_click_url}' || '').trim(),
+  };
+
+  var pools = {};
+
+  function playUrl(url) {
+    if (!url) return;
+    var pool = pools[url];
+    if (!pool) {
+      pool = [];
+      pools[url] = pool;
+      for (var i = 0; i < 4; i++) {
+        var a = new Audio(url);
+        a.volume = 1;
+        pool.push(a);
+      }
+    }
+    var audio = pool[0];
+    var i;
+    for (i = 0; i < pool.length; i++) {
+      if (pool[i].paused || pool[i].ended) {
+        audio = pool[i];
+        break;
+      }
+      audio = pool[i];
+    }
+    try {
+      audio.currentTime = 0;
+      var p = audio.play();
+      if (p !== undefined && typeof p.then === 'function') {
+        p.catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  var api = {
+    urls: urls,
+    play: function (id) {
+      var u = urls[id];
+      if (!u) return;
+      playUrl(u);
+    },
+    register: function (id, url) {
+      if (!id) return;
+      urls[id] = (url || '').trim();
+    },
+  };
+
+  window.__SILO_SFX__ = api;
+
+  if (window.__SILO_SFX_CLICK_BOUND__) return;
+  window.__SILO_SFX_CLICK_BOUND__ = true;
+
+  document.addEventListener(
+    'click',
+    function (ev) {
+      var t = ev.target;
+      while (t && t.nodeType !== 1) t = t.parentElement;
+      if (!t || typeof t.closest !== 'function') return;
+      var el = t.closest('button');
+      if (!el) {
+        el = t.closest('input[type="button"], input[type="submit"]');
+      }
+      if (!el) return;
+
+      var sfxId = 'buttonClick';
+      var node = t;
+      while (node) {
+        if (node.hasAttribute && node.hasAttribute('data-sfx')) {
+          var v = node.getAttribute('data-sfx');
+          v = (v || '').trim();
+          if (v === 'none') return;
+          sfxId = v;
+          break;
+        }
+        if (node === el) break;
+        node = node.parentElement;
+      }
+
+      var sfx = window.__SILO_SFX__;
+      if (!sfx || typeof sfx.play !== 'function') return;
+      sfx.play(sfxId);
+    },
+    true
+  );
 })();
 </script>

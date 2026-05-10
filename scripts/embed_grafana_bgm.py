@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge BGM templating variables + audio controls into the Silo Command nav panel."""
+"""Merge BGM/SFX templating variables + nav audio into the Silo Command nav panel."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SNIPPET = ROOT / "grafana" / "bgm-panel-snippet.html"
 
 BGM_URL = "http://localhost:5001/assets/audio/JazzWithAmbience.ogg"
+SFX_BUTTON_CLICK_URL = "http://localhost:5001/assets/audio/sfx_button_click.mp3"
 
 NAV_PANEL_ID = 1
 BGM_PANEL_ID = 200
@@ -92,6 +93,8 @@ def main() -> None:
             lst.append(_const("dashboard_uid", uid))
         if not any(v.get("name") == "bgm_url" for v in lst):
             lst.append(_const("bgm_url", BGM_URL))
+        if not any(v.get("name") == "sfx_button_click_url" for v in lst):
+            lst.append(_const("sfx_button_click_url", SFX_BUTTON_CLICK_URL))
         panels = data.setdefault("panels", [])
         data["panels"] = [
             p
