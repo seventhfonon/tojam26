@@ -205,7 +205,7 @@ def test_try_spawn_skips_kind_already_present():
     assert len(intros) == 1
 
 
-def test_intro_after_player_resolve_sets_rat_trappers_unlocked():
+def test_intro_player_resolve_does_not_unlock_trappers_without_focus():
     uid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     tick = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
     user_row = MagicMock()
@@ -216,7 +216,7 @@ def test_intro_after_player_resolve_sets_rat_trappers_unlocked():
     with patch("app.events.db.session", mock_session):
         _rats_silo_intro_after_player_resolve(uid, tick)
 
-    assert user_row.rat_trappers_unlocked is True
+    assert user_row.rat_trappers_unlocked is False
 
 
 def test_try_spawn_event_rats_suppressed_when_trapper_output_covers_margin():

@@ -353,9 +353,19 @@ class BunkerSocialState(db.Model):
         DateTime(timezone=True), nullable=True
     )
     #: Off-books currency for Inner Circle actions (temp jobs, etc.).
-    inner_circle_cash: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    inner_circle_cash: Mapped[float] = mapped_column(Float, nullable=False, default=1000.0)
     #: Mandatory basket-weaving hours per resident (0..``constants.BASKET_WEAVING_HOURS_MAX``).
     basket_weaving_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: ``True`` after Geiger rumor exodus crisis ends — next Give Speech clears this and unlocks Fireside focus gate.
+    awaiting_post_geiger_exodus_speech: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    #: ``True`` once the player uses Give Speech after a finished rumor exodus (see ``awaiting_post_geiger_exodus_speech``).
+    fireside_chats_focus_gate_done: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    #: Set when a Temp Job completes with the doubt “bad outcome”; unlocks an Inner Circle focus branch.
+    temp_job_backfire_seen: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     user: Mapped[User] = relationship(back_populates="bunker_social_state")
 
@@ -384,6 +394,7 @@ class InnerCircleMember(db.Model):
     #: Static agreeableness (0 prickly .. 100 accommodating); slows loyalty tracking frustration.
     disposition: Mapped[float] = mapped_column(Float, nullable=False)
     popularity: Mapped[float] = mapped_column(Float, nullable=False)
+    departed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     task_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     task_started_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

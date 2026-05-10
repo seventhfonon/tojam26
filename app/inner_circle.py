@@ -79,6 +79,8 @@ def tick_member_psyche(
         select(InnerCircleMember).where(InnerCircleMember.user_id == user_id)
     ).all()
     for m in members:
+        if m.departed:
+            continue
         fr = float(m.frustration)
         fr += k_fr * (pressure - fr) * elapsed_seconds
         pop = float(m.popularity)
@@ -103,9 +105,10 @@ def sync_aggregate_inner_circle_loyalty(user_id: str) -> None:
     members = db.session.scalars(
         select(InnerCircleMember).where(InnerCircleMember.user_id == user_id)
     ).all()
-    if not members:
+    active = [x for x in members if not x.departed]
+    if not active:
         return
-    mean_loy = sum(float(x.loyalty) for x in members) / len(members)
+    mean_loy = sum(float(x.loyalty) for x in active) / len(active)
     social.inner_circle_loyalty = int(round(max(0.0, min(100.0, mean_loy))))
 
 
@@ -142,6 +145,8 @@ def complete_due_tasks(
     social = db.session.get(BunkerSocialState, user_id)
 
     for m in members:
+        if m.departed:
+            continue
         if m.task_kind is None or m.task_ends_at is None:
             continue
         if tick_time + timedelta(microseconds=1) < m.task_ends_at:
@@ -248,6 +253,8 @@ def complete_due_tasks(
                 db.session.add(
                     BunkerDoubt(user_id=user_id, doubt=d, timestamp=tick_time)
                 )
+                if social is not None:
+                    social.temp_job_backfire_seen = True
 
         elif kind == constants.INNER_CIRCLE_TASK_GRANT_LUXURIES:
             m.frustration = max(
@@ -268,12 +275,18 @@ def _start_task(m: InnerCircleMember, kind: str, duration_seconds: int, now: dat
 
 def try_grant_luxuries(user_id: str, slot: int, now: datetime) -> str | None:
     """Return None on success, else an error code."""
+    from . import focus_tree as ft
+
     if slot < 0 or slot >= constants.INNER_CIRCLE_MEMBER_COUNT:
         return "bad_slot"
     seed_members_for_user_if_needed(user_id)
+    if not ft.user_completed_focus(user_id, "ft_venture_out"):
+        return "locked"
     m = db.session.get(InnerCircleMember, (user_id, slot))
     if m is None:
         return "no_member"
+    if m.departed:
+        return "departed"
     if member_is_busy(m, now):
         return "busy"
 
@@ -319,12 +332,18 @@ def try_grant_luxuries(user_id: str, slot: int, now: datetime) -> str | None:
 
 
 def try_start_stage_incident(user_id: str, slot: int, now: datetime) -> str | None:
+    from . import focus_tree as ft
+
     if slot < 0 or slot >= constants.INNER_CIRCLE_MEMBER_COUNT:
         return "bad_slot"
     seed_members_for_user_if_needed(user_id)
+    if not ft.user_completed_focus(user_id, "ft_venture_out"):
+        return "locked"
     m = db.session.get(InnerCircleMember, (user_id, slot))
     if m is None:
         return "no_member"
+    if m.departed:
+        return "departed"
     if member_is_busy(m, now):
         return "busy"
     _start_task(
@@ -337,12 +356,18 @@ def try_start_stage_incident(user_id: str, slot: int, now: datetime) -> str | No
 
 
 def try_start_buy_groceries(user_id: str, slot: int, now: datetime) -> str | None:
+    from . import focus_tree as ft
+
     if slot < 0 or slot >= constants.INNER_CIRCLE_MEMBER_COUNT:
         return "bad_slot"
     seed_members_for_user_if_needed(user_id)
+    if not ft.user_completed_focus(user_id, "ft_venture_out"):
+        return "locked"
     m = db.session.get(InnerCircleMember, (user_id, slot))
     if m is None:
         return "no_member"
+    if m.departed:
+        return "departed"
     if member_is_busy(m, now):
         return "busy"
     social = db.session.get(BunkerSocialState, user_id)
@@ -360,12 +385,18 @@ def try_start_buy_groceries(user_id: str, slot: int, now: datetime) -> str | Non
 
 
 def try_start_temp_job(user_id: str, slot: int, now: datetime) -> str | None:
+    from . import focus_tree as ft
+
     if slot < 0 or slot >= constants.INNER_CIRCLE_MEMBER_COUNT:
         return "bad_slot"
     seed_members_for_user_if_needed(user_id)
+    if not ft.user_completed_focus(user_id, "ft_worse_than_being_exploited"):
+        return "locked"
     m = db.session.get(InnerCircleMember, (user_id, slot))
     if m is None:
         return "no_member"
+    if m.departed:
+        return "departed"
     if member_is_busy(m, now):
         return "busy"
     _start_task(
@@ -378,6 +409,8 @@ def try_start_temp_job(user_id: str, slot: int, now: datetime) -> str | None:
 
 
 def inner_circle_status_payload(user_id: str, now: datetime) -> dict[str, object]:
+    from . import focus_tree as ft
+
     seed_members_for_user_if_needed(user_id)
     social = db.session.get(BunkerSocialState, user_id)
     cash = float(social.inner_circle_cash) if social is not None else 0.0
@@ -406,10 +439,15 @@ def inner_circle_status_payload(user_id: str, now: datetime) -> dict[str, object
                 "busy": busy,
                 "task_kind": m.task_kind,
                 "task_progress_percent": prog,
+                "departed": bool(m.departed),
             }
         )
     return {
         "cash": cash,
+        "venture_actions_unlocked": ft.user_completed_focus(user_id, "ft_venture_out"),
+        "temp_jobs_unlocked": ft.user_completed_focus(
+            user_id, "ft_worse_than_being_exploited"
+        ),
         "buy_groceries_cash_cost": float(
             constants.INNER_CIRCLE_BUY_GROCERIES_CASH_COST
         ),

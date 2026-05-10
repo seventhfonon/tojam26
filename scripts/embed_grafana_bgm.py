@@ -41,6 +41,17 @@ def _const(name: str, value: str) -> dict[str, object]:
     }
 
 
+def _set_constant(lst: list[dict[str, object]], name: str, value: str) -> None:
+    """Ensure ``name`` exists and matches ``value`` (overwrites stale URLs)."""
+    for v in lst:
+        if v.get("name") == name:
+            v["query"] = value
+            v["current"] = {"selected": True, "text": value, "value": value}
+            v["options"] = [{"selected": True, "text": value, "value": value}]
+            return
+    lst.append(_const(name, value))
+
+
 def _strip_leading_html_comment(html: str) -> str:
     h = html.lstrip()
     if h.startswith("<!--"):
@@ -92,10 +103,8 @@ def main() -> None:
         uid = str(data.get("uid", ""))
         if not any(v.get("name") == "dashboard_uid" for v in lst):
             lst.append(_const("dashboard_uid", uid))
-        if not any(v.get("name") == "bgm_url" for v in lst):
-            lst.append(_const("bgm_url", BGM_URL))
-        if not any(v.get("name") == "sfx_button_click_url" for v in lst):
-            lst.append(_const("sfx_button_click_url", SFX_BUTTON_CLICK_URL))
+        _set_constant(lst, "bgm_url", BGM_URL)
+        _set_constant(lst, "sfx_button_click_url", SFX_BUTTON_CLICK_URL)
         panels = data.setdefault("panels", [])
         data["panels"] = [
             p

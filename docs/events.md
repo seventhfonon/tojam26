@@ -22,7 +22,7 @@ Global simulation knobs (tick interval, baseline food rates, investigation team 
 | `spawn_announcement` | `(user_id, tick_time) → str \| None` | Optional `SystemMessage` body when the row is created; `None` skips posting. |
 | `on_spawn` | `(user_id, tick_time) → None` | Runs right after the active-event row is added (same transaction), before `spawn_announcement`; use for immediate DB/session mutations (e.g. flags on `User`). |
 | `system` | `str \| None` | Optional bunker subsystem id (e.g. `"farming"`); ties player-resolution to investigation target. |
-| `on_player_resolve` | `(user_id, tick_time) → None` \| omitted | Optional hook run immediately after **`player_resolve`** in **`finalize_investigation_if_due`** (same flush); use for unlock flags etc. |
+| `on_player_resolve` | `(user_id, tick_time) → None` \| omitted | Optional hook run immediately after **`player_resolve`** in **`finalize_investigation_if_due`** (same flush); use for unlock flags etc. Rat trappers are **not** unlocked here from `rats_silo_intro`; completion of focus **`ft_explore_novel_food_sources`** handles **`User.rat_trappers_unlocked`** instead. |
 
 ---
 

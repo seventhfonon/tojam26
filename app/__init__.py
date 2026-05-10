@@ -643,6 +643,35 @@ def _ensure_bunker_social_inner_circle_cash_column() -> None:
         )
 
 
+def _ensure_bunker_social_focus_gate_columns() -> None:
+    """Social flags for Focus Tree prerequisites (Geiger aftermath speech, temp-job branch)."""
+    if "bunker_social_state" not in inspect(db.engine).get_table_names():
+        return
+    stmts = (
+        "ALTER TABLE bunker_social_state ADD COLUMN IF NOT EXISTS awaiting_post_geiger_exodus_speech "
+        "BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE bunker_social_state ADD COLUMN IF NOT EXISTS fireside_chats_focus_gate_done "
+        "BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE bunker_social_state ADD COLUMN IF NOT EXISTS temp_job_backfire_seen "
+        "BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    with db.engine.begin() as conn:
+        for s in stmts:
+            conn.execute(text(s))
+
+
+def _ensure_inner_circle_member_departed_column() -> None:
+    if "inner_circle_members" not in inspect(db.engine).get_table_names():
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE inner_circle_members ADD COLUMN IF NOT EXISTS departed "
+                "BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        )
+
+
 def _ensure_bunker_social_basket_weaving_hours_column() -> None:
     """Mandatory basket-weaving hours per resident (Community team-building silo class)."""
     insp = inspect(db.engine)
@@ -875,6 +904,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_user_fireside_columns()
         _ensure_user_geiger_rumor_exodus_columns()
         _ensure_bunker_social_inner_circle_cash_column()
+        _ensure_bunker_social_focus_gate_columns()
+        _ensure_inner_circle_member_departed_column()
         _ensure_bunker_social_basket_weaving_hours_column()
         _ensure_inner_circle_members_psyche_columns()
         _ensure_inner_circle_members_seed()

@@ -7,14 +7,14 @@ from pathlib import Path
 from flask import Flask
 
 
-def test_ode_to_joy_mp3_exists_on_disk():
+def test_plutonium_jazz_ogg_exists_on_disk():
     root = Path(__file__).resolve().parents[1]
     p = root / "app" / "assets" / "audio" / "plutonium_jazz.ogg"
     assert p.is_file()
     assert p.stat().st_size > 10_000
 
 
-def test_serve_game_audio_returns_mp3():
+def test_serve_game_audio_returns_ogg():
     from app.routes import bp
 
     app = Flask(__name__)
@@ -22,7 +22,7 @@ def test_serve_game_audio_returns_mp3():
     c = app.test_client()
     r = c.get("/assets/audio/plutonium_jazz.ogg")
     assert r.status_code == 200
-    assert r.mimetype == "audio/mpeg"
+    assert r.mimetype == "audio/ogg"
     assert len(r.data) > 10_000
 
 

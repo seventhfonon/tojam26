@@ -43,6 +43,7 @@ from sqlalchemy.orm import selectinload
 
 from .extensions import db
 from . import constants
+from . import dashboard_gates
 from . import inner_circle
 from .focus_tree import focus_tree_status_payload, try_complete_focus
 from .events import (
@@ -377,6 +378,7 @@ def _get_or_create_social_state(user_id: str) -> BunkerSocialState:
         row = BunkerSocialState(
             user_id=user_id,
             inner_circle_loyalty=constants.INITIAL_INNER_CIRCLE_LOYALTY,
+            inner_circle_cash=float(constants.INITIAL_INNER_CIRCLE_CASH),
         )
         db.session.add(row)
         inner_circle.seed_members_for_user_if_needed(user_id)
@@ -412,6 +414,50 @@ def _reject_if_sermon_locked(user: User | None):
     if _player_actions_locked(user, now):
         return _action_response(user.id)
     return None
+
+
+def _fireside_ui_bundle(user_id: str) -> dict[str, object]:
+    """Community Fireside panel: title, per-kind labels, cooldown, and enabled kinds."""
+    from .focus_tree import completed_node_ids
+
+    done = completed_node_ids(user_id)
+    reassuring = constants.FIRESIDE_KIND_REASSURING
+    frank = constants.FIRESIDE_KIND_FRANK
+    fear = constants.FIRESIDE_KIND_FEARMONGERING
+    stock_labels = {
+        reassuring: "Reassuring",
+        frank: "Frank",
+        fear: "Fearmongering",
+    }
+    all_enabled = {reassuring: True, frank: True, fear: True}
+    if "ft_fire_and_brimstone" in done:
+        return {
+            "panel_title": "Fire and Brimstone",
+            "cooldown_seconds": int(constants.FIRESIDE_BRIMSTONE_COOLDOWN_SECONDS),
+            "labels": {
+                reassuring: "Everyone outside is a sinner",
+                frank: "We are all sinners",
+                fear: "You are all sinners",
+            },
+            "kind_enabled": dict(all_enabled),
+        }
+    if "ft_fireside_chats" in done:
+        return {
+            "panel_title": "Fireside Chats",
+            "cooldown_seconds": int(constants.FIRESIDE_CHAT_COOLDOWN_SECONDS),
+            "labels": dict(stock_labels),
+            "kind_enabled": dict(all_enabled),
+        }
+    return {
+        "panel_title": "Give Speech",
+        "cooldown_seconds": int(constants.FIRESIDE_GIVE_SPEECH_COOLDOWN_SECONDS),
+        "labels": dict(stock_labels),
+        "kind_enabled": {
+            reassuring: True,
+            frank: False,
+            fear: False,
+        },
+    }
 
 
 def _create_player() -> User:
@@ -460,6 +506,7 @@ def _create_player() -> User:
         BunkerSocialState(
             user_id=user.id,
             inner_circle_loyalty=constants.INITIAL_INNER_CIRCLE_LOYALTY,
+            inner_circle_cash=float(constants.INITIAL_INNER_CIRCLE_CASH),
         )
     )
     inner_circle.seed_members_for_user_if_needed(user.id)
@@ -1129,6 +1176,10 @@ def action_give_speech():
     social.last_give_speech_at = now
     db.session.add(BunkerLoyalty(user_id=user.id, loyalty=new_loyalty, timestamp=now))
     db.session.add(BunkerDoubt(user_id=user.id, doubt=new_doubt, timestamp=now))
+    soc_gate = db.session.get(BunkerSocialState, user.id)
+    if soc_gate is not None and soc_gate.awaiting_post_geiger_exodus_speech:
+        soc_gate.fireside_chats_focus_gate_done = True
+        soc_gate.awaiting_post_geiger_exodus_speech = False
     db.session.commit()
     log.info(
         "give speech: user=%s loyalty %.2f→%.2f doubt %.2f→%.2f",
@@ -1332,15 +1383,22 @@ def action_start_fireside_chat():
         return _action_response(user.id)
 
     now = datetime.now(timezone.utc)
+    bundle = _fireside_ui_bundle(user.id)
+    kinds_ok = bundle["kind_enabled"]
+    if not isinstance(kinds_ok, dict) or not bool(kinds_ok.get(kind_raw, False)):
+        log.warning("start fireside: kind not enabled=%r user=%s", kind_raw, user.id)
+        return _action_response(user.id)
+
     if user.sermon_busy_until is not None and now < user.sermon_busy_until:
         return _action_response(user.id)
     if user.fireside_busy_until is not None and now < user.fireside_busy_until:
         return _action_response(user.id)
 
     social = _get_or_create_social_state(user.id)
+    cd_cap = int(bundle["cooldown_seconds"])
     cd_rem = _social_cooldown_remaining_seconds(
         social.last_fireside_chat_at,
-        constants.FIRESIDE_CHAT_COOLDOWN_SECONDS,
+        cd_cap,
         now,
     )
     if cd_rem > 0:
@@ -1474,8 +1532,10 @@ def socials_action_status():
     basket_can_adjust = False
 
     can_show_movie_flag = False
+    fire_ui: dict[str, object] = {}
 
     if user is not None:
+        fire_ui = _fireside_ui_bundle(user.id)
         md = _social_movie_status_detail(user, now)
         movie_rem = int(md["movie_cooldown_seconds_remaining"])
         actions_locked = bool(md["actions_locked"])
@@ -1510,9 +1570,10 @@ def socials_action_status():
             council_rem = _social_cooldown_remaining_seconds(
                 social.last_meet_council_at, council_cd, now
             )
+            cd_dyn = int(fire_ui["cooldown_seconds"])
             fireside_cd_rem = _social_cooldown_remaining_seconds(
                 social.last_fireside_chat_at,
-                constants.FIRESIDE_CHAT_COOLDOWN_SECONDS,
+                cd_dyn,
                 now,
             )
 
@@ -1574,7 +1635,10 @@ def socials_action_status():
             "fireside_seconds_remaining": fireside_rem,
             "fireside_cooldown_seconds_remaining": fireside_cd_rem,
             "fireside_chat_duration_seconds": int(constants.FIRESIDE_CHAT_DURATION_SECONDS),
-            "fireside_chat_cooldown_seconds": int(constants.FIRESIDE_CHAT_COOLDOWN_SECONDS),
+            "fireside_chat_cooldown_seconds": int(fire_ui["cooldown_seconds"])
+            if fire_ui
+            else int(constants.FIRESIDE_GIVE_SPEECH_COOLDOWN_SECONDS),
+            "fireside_ui": fire_ui,
             "can_start_fireside_chat": can_start_fireside_chat,
             "can_start_sermon": user is not None and not actions_locked,
             "can_show_movie": can_show_movie_flag,
@@ -1841,6 +1905,19 @@ def systems_investigation_dispatch_status():
     user = _identify_player()
     system_q = (request.args.get("system") or "").strip()
     payload = investigation_dispatch_status_payload(user.id if user else None, system_q)
+    resp = jsonify(payload)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@bp.route("/systems/ui-gates")
+def systems_ui_gates():
+    """JSON for Grafana: panel IDs to hide based on focus completions / active events."""
+    user = _identify_player()
+    uid_q = (request.args.get("user_id") or "").strip()
+    user_id = user.id if user else (uid_q if _is_valid_uuid(uid_q) else None)
+    dash_uid = (request.args.get("dashboard_uid") or "").strip()
+    payload = dashboard_gates.ui_gates_payload(user_id, dash_uid)
     resp = jsonify(payload)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp

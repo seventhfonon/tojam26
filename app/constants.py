@@ -232,6 +232,31 @@ INNER_CIRCLE_MEMBER_NAMES: tuple[str, ...] = (
     "Nadia Firth",
 )
 INNER_CIRCLE_MEMBER_COUNT = len(INNER_CIRCLE_MEMBER_NAMES)
+# Starting liquid currency for new bunker sessions (Inner Circle dashboard).
+INITIAL_INNER_CIRCLE_CASH = 1000.0
+# Focus / narrative: Inner Circle member slot that leaves during ``Venture Out`` (0-based index).
+VENTURE_OUT_DEPARTING_MEMBER_SLOT = 2
+# --- Focus predicates ---
+SHAKESPEARE_FOCUS_LOYALTY_BELOW = 70.0
+SHAKESPEARE_FOCUS_BOREDOM_ABOVE = 30.0
+TEMP_JOB_FOCUS_CASH_THRESHOLD = 20.0
+VENTURE_OUT_FAREWELL_MESSAGE = (
+    "{name}: I've said three versions of this message aloud in an empty stairwell and deleted them all. "
+    "I'm going up on my own terms — not because I believe the sermons about ash gardens, but because "
+    "I can't keep translating radiation curves into bedtime stories for adults who deserve harder truths "
+    "than I know how to speak.\n\n"
+    "The hatch crew knows I've been practicing the route — tell them not to pretend surprise. "
+    "I'll carry the handheld dosimeter we calibrated together last quarter; if it screams, I'll treat "
+    "that as data, not drama. If it stays quiet longer than any of us dare hope, I'll send one terse ping "
+    "on the old scout frequency — not poetry, just coordinates and weather smell — then I'll go dark so "
+    "you don't mistake honesty for recruitment.\n\n"
+    "Don't deputize my empty chair into mythology. Leave my ration ledger open: I wasn't stealing; I was "
+    "padding slack for nights nobody thanked me for covering. If loyalty still counts for anything, waste "
+    "that surplus on someone who's afraid to ask.\n\n"
+    "I'm stepping through the lock now. Hold your arguments until the pumps finish their cycle — "
+    "the hiss is the closest thing we have to a blessing."
+)
+
 INNER_CIRCLE_INITIAL_MEMBER_LOYALTIES: tuple[float, ...] = (58.0, 62.0, 60.0, 59.0, 61.0)
 INNER_CIRCLE_INITIAL_MEMBER_POPULARITIES: tuple[float, ...] = (52.0, 48.0, 55.0, 50.0, 53.0)
 INNER_CIRCLE_INITIAL_MEMBER_FRUSTRATIONS: tuple[float, ...] = (
@@ -309,7 +334,12 @@ SOCIAL_SPEECH_DOUBT_RELIEF_BASE = 12.0
 SOCIAL_SPEECH_DIMINISH_K = 0.5
 
 # --- Fireside chats (Community dashboard; tuning intentionally undocumented in UI) ---
+# Cooldown between Fireside Chat sessions after ``Fireside Chats`` focus completes (before Brimstone).
 FIRESIDE_CHAT_COOLDOWN_SECONDS = 120
+# Early-game panel behaves like Give Speech: only reassuring chat type; longer cooldown.
+FIRESIDE_GIVE_SPEECH_COOLDOWN_SECONDS = 300
+# After ``Fire and Brimstone`` focus.
+FIRESIDE_BRIMSTONE_COOLDOWN_SECONDS = 60
 FIRESIDE_CHAT_DURATION_SECONDS = 30
 
 FIRESIDE_KIND_REASSURING = "reassuring"

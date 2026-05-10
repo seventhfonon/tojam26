@@ -1,19 +1,28 @@
 """Focus Tree dashboard: discrete research nodes with parent gates (branch / merge).
 
-Tree shape is code-defined in :data:`FOCUS_TREE_NODES`. Merge nodes list two parents;
-their button stays disabled until both upstream nodes are completed.
+Some nodes require extra runtime predicates (population, inner-circle cash, social flags).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import select
 
+from . import constants
 from .events import EventDefinition, spawn_event_for_focus_completion
 from .extensions import db
-from .models import FocusTreeCompletion
+from .models import (
+    BunkerBoredom,
+    BunkerLoyalty,
+    BunkerPopulation,
+    BunkerSocialState,
+    FocusTreeCompletion,
+    InnerCircleMember,
+    User,
+)
 
 
 @dataclass(frozen=True)
@@ -23,68 +32,98 @@ class FocusNodeDef:
     description: str
     requirements: str
     parent_ids: tuple[str, ...]
-    #: When set, completing this focus spawns this gameplay event (same hooks as RNG spawn).
     spawn_event: EventDefinition | None = None
+    completion_hook: str | None = None
+    predicate_key: str | None = None
 
 
 FOCUS_TREE_NODES: tuple[FocusNodeDef, ...] = (
     FocusNodeDef(
-        id="ft_command_coordination",
-        title="Command coordination",
+        id="ft_explore_novel_food_sources",
+        title="Explore Novel Food Sources",
         description=(
-            "Bring silo departments onto a single incident channel so downstream "
-            "plans do not fork silently."
+            "The infestation of vermin in our food storage presents a risk and an opportunity. "
+            "We need not let valuable resources go to waste."
         ),
-        requirements="No prerequisites — establish the chain of command.",
+        requirements="No prerequisites.",
         parent_ids=(),
-        spawn_event=EventDefinition.RATS_SILO_INTRO,
+        completion_hook="rat_trappers_unlock",
     ),
     FocusNodeDef(
-        id="ft_supply_audit",
-        title="Supply lane audit",
+        id="ft_fireside_chats",
+        title="Fireside Chats",
         description=(
-            "Inventory spare hydro filters and crank lubricant before parallel work "
-            "stress-tests both corridors."
+            "Structured morale broadcasts beyond a single reassuring tone — rotate framing "
+            "without letting rumor own the silence between drills."
         ),
-        requirements="Complete Command coordination.",
-        parent_ids=("ft_command_coordination",),
-        spawn_event=EventDefinition.RATS_SILO,
+        requirements="Complete Explore Novel Food Sources. Give Speech once after the rumor exodus crisis ends.",
+        parent_ids=("ft_explore_novel_food_sources",),
+        predicate_key="fireside_chats_gate",
     ),
     FocusNodeDef(
-        id="ft_waste_loop_review",
-        title="Waste-loop review",
+        id="ft_bunker_shakespeare_company",
+        title="Found Bunker Shakespeare Company",
         description=(
-            "Verify compost return paths and gray-water routing so expanded farming "
-            "does not starve power cooling loops."
-        ),
-        requirements="Complete Command coordination.",
-        parent_ids=("ft_command_coordination",),
-        spawn_event=EventDefinition.RATS_SILO,
-    ),
-    FocusNodeDef(
-        id="ft_joint_readiness_board",
-        title="Joint readiness board",
-        description=(
-            "Merge hydro and power schedules into one board so neither corridor "
-            "claims the same maintenance window."
+            "Formalize ad-hoc readings into a resident theatre cadre — boredom relief that "
+            "does not pretend the outside world is hypothetical."
         ),
         requirements=(
-            "Both Supply lane audit and Waste-loop review must be marked complete "
-            "before this focus unlocks."
+            "Complete Explore Novel Food Sources. Unlocks when bunker loyalty falls below "
+            f"{constants.SHAKESPEARE_FOCUS_LOYALTY_BELOW:.0f}% or boredom rises above "
+            f"{constants.SHAKESPEARE_FOCUS_BOREDOM_ABOVE:.0f}."
         ),
-        parent_ids=("ft_supply_audit", "ft_waste_loop_review"),
-        spawn_event=EventDefinition.FIRESIDE_RHETORIC_BACKLASH,
+        parent_ids=("ft_explore_novel_food_sources",),
+        predicate_key="bunker_shakespeare_gate",
     ),
     FocusNodeDef(
-        id="ft_surface_handshake",
-        title="Surface handshake drill",
+        id="ft_venture_out",
+        title="Venture Out",
         description=(
-            "Timed ping drill with the antenna mast — proves merged logistics can "
-            "support a single outbound push."
+            "Acknowledge that some trusted voices will test the threshold themselves — "
+            "and prepare the Inner Circle for harder bargains indoors."
         ),
-        requirements="Complete Joint readiness board.",
-        parent_ids=("ft_joint_readiness_board",),
-        spawn_event=EventDefinition.GEIGER_RUMOR_EXODUS,
+        requirements=(
+            "Complete Fireside Chats and Found Bunker Shakespeare Company. Unlocks when "
+            "population drops below two-thirds of the original headcount."
+        ),
+        parent_ids=("ft_fireside_chats", "ft_bunker_shakespeare_company"),
+        predicate_key="venture_out_gate",
+        completion_hook="venture_out_narrative",
+    ),
+    FocusNodeDef(
+        id="ft_worse_than_being_exploited",
+        title="The only thing worse than being exploited…",
+        description=(
+            "When operating cash nearly bottoms out, sanction short off-books labor — "
+            "with explicit consent windows per Inner Circle member."
+        ),
+        requirements=(
+            f"Complete Venture Out. Unlocks when Inner Circle cash falls below "
+            f"${constants.TEMP_JOB_FOCUS_CASH_THRESHOLD:.0f}."
+        ),
+        parent_ids=("ft_venture_out",),
+        predicate_key="cash_below_temp_threshold_gate",
+    ),
+    FocusNodeDef(
+        id="ft_not_being_exploited",
+        title="…is not being exploited.",
+        description=(
+            "A temp job goes sideways in public view — convert the sting into doctrine "
+            "about boundaries, receipts, and rotation."
+        ),
+        requirements="Complete Venture Out. Unlocks after a Temp Job backfires (doubt spike outcome).",
+        parent_ids=("ft_venture_out",),
+        predicate_key="temp_job_backfire_gate",
+    ),
+    FocusNodeDef(
+        id="ft_fire_and_brimstone",
+        title="Fire and Brimstone",
+        description=(
+            "Escalate broadcast rhetoric into explicit moral geometry — shorter cadence, "
+            "sharper binaries, less room for corridor improvisation."
+        ),
+        requirements="Complete both exploitation-branch focuses.",
+        parent_ids=("ft_worse_than_being_exploited", "ft_not_being_exploited"),
     ),
 )
 
@@ -98,8 +137,82 @@ def completed_node_ids(user_id: str) -> set[str]:
     return set(rows)
 
 
+def user_completed_focus(user_id: str, node_id: str) -> bool:
+    return node_id in completed_node_ids(user_id)
+
+
 def parents_satisfied(done: set[str], node: FocusNodeDef) -> bool:
     return all(pid in done for pid in node.parent_ids)
+
+
+def _pred_fireside_chats_gate(user_id: str) -> bool:
+    soc = db.session.get(BunkerSocialState, user_id)
+    return bool(soc and soc.fireside_chats_focus_gate_done)
+
+
+def _pred_bunker_shakespeare_gate(user_id: str) -> bool:
+    latest_loy = db.session.scalars(
+        select(BunkerLoyalty)
+        .where(BunkerLoyalty.user_id == user_id)
+        .order_by(BunkerLoyalty.timestamp.desc())
+        .limit(1)
+    ).first()
+    latest_boredom = db.session.scalars(
+        select(BunkerBoredom)
+        .where(BunkerBoredom.user_id == user_id)
+        .order_by(BunkerBoredom.timestamp.desc())
+        .limit(1)
+    ).first()
+    if latest_loy is not None and float(latest_loy.loyalty) < float(
+        constants.SHAKESPEARE_FOCUS_LOYALTY_BELOW
+    ):
+        return True
+    if latest_boredom is not None and float(latest_boredom.boredom) > float(
+        constants.SHAKESPEARE_FOCUS_BOREDOM_ABOVE
+    ):
+        return True
+    return False
+
+
+def _pred_venture_out_gate(user_id: str) -> bool:
+    pop_row = db.session.scalars(
+        select(BunkerPopulation)
+        .where(BunkerPopulation.user_id == user_id)
+        .order_by(BunkerPopulation.timestamp.desc())
+        .limit(1)
+    ).first()
+    if pop_row is None:
+        return False
+    threshold = int(float(constants.INITIAL_POPULATION) * (2.0 / 3.0) + 1e-9)
+    return int(pop_row.count) < threshold
+
+
+def _pred_cash_below_temp_threshold_gate(user_id: str) -> bool:
+    soc = db.session.get(BunkerSocialState, user_id)
+    if soc is None:
+        return False
+    return float(soc.inner_circle_cash) < float(constants.TEMP_JOB_FOCUS_CASH_THRESHOLD)
+
+
+def _pred_temp_job_backfire_gate(user_id: str) -> bool:
+    soc = db.session.get(BunkerSocialState, user_id)
+    return bool(soc and soc.temp_job_backfire_seen)
+
+
+_FOCUS_PREDICATES: dict[str, Callable[[str], bool]] = {
+    "fireside_chats_gate": _pred_fireside_chats_gate,
+    "bunker_shakespeare_gate": _pred_bunker_shakespeare_gate,
+    "venture_out_gate": _pred_venture_out_gate,
+    "cash_below_temp_threshold_gate": _pred_cash_below_temp_threshold_gate,
+    "temp_job_backfire_gate": _pred_temp_job_backfire_gate,
+}
+
+
+def predicate_satisfied(user_id: str, node: FocusNodeDef) -> bool:
+    if node.predicate_key is None:
+        return True
+    fn = _FOCUS_PREDICATES.get(node.predicate_key)
+    return True if fn is None else bool(fn(user_id))
 
 
 def focus_tree_status_payload(user_id: str | None) -> dict[str, object]:
@@ -113,9 +226,52 @@ def focus_tree_status_payload(user_id: str | None) -> dict[str, object]:
     out: dict[str, dict[str, bool]] = {}
     for n in FOCUS_TREE_NODES:
         completed = n.id in done
-        can_activate = not completed and parents_satisfied(done, n)
+        can_activate = (
+            not completed
+            and parents_satisfied(done, n)
+            and predicate_satisfied(user_id, n)
+        )
         out[n.id] = {"completed": completed, "can_activate": can_activate}
     return {"nodes": out}
+
+
+def _hook_rat_trappers_unlock(user_id: str, when: datetime) -> None:
+    from .constants import MESSAGE_CHANNEL_BULLETIN
+    from .events import _post_player_message
+
+    row = db.session.get(User, user_id)
+    if row is not None:
+        row.rat_trappers_unlocked = True
+    _post_player_message(
+        user_id,
+        (
+            "Quartermaster signed off on vermin-control staffing: trapper shifts are authorized "
+            "under Farming allocations — recover what the infestation would waste."
+        ),
+        when,
+        channel=MESSAGE_CHANNEL_BULLETIN,
+    )
+
+
+def _hook_venture_out(user_id: str, when: datetime) -> None:
+    from . import inner_circle
+    from .constants import MESSAGE_CHANNEL_GROUP_CHAT
+    from .events import _post_player_message
+
+    inner_circle.seed_members_for_user_if_needed(user_id)
+    slot = int(constants.VENTURE_OUT_DEPARTING_MEMBER_SLOT)
+    name = constants.INNER_CIRCLE_MEMBER_NAMES[slot]
+    m = db.session.get(InnerCircleMember, (user_id, slot))
+    if m is not None:
+        m.departed = True
+    body = constants.VENTURE_OUT_FAREWELL_MESSAGE.format(name=name)
+    _post_player_message(user_id, body, when, channel=MESSAGE_CHANNEL_GROUP_CHAT)
+
+
+_COMPLETION_HOOKS: dict[str, Callable[[str, datetime], None]] = {
+    "rat_trappers_unlock": _hook_rat_trappers_unlock,
+    "venture_out_narrative": _hook_venture_out,
+}
 
 
 def try_complete_focus(user_id: str, node_id: str, now: datetime) -> bool:
@@ -125,9 +281,16 @@ def try_complete_focus(user_id: str, node_id: str, now: datetime) -> bool:
     done = completed_node_ids(user_id)
     if node.id in done or not parents_satisfied(done, node):
         return False
+    if not predicate_satisfied(user_id, node):
+        return False
     db.session.add(
         FocusTreeCompletion(user_id=user_id, node_id=node.id, completed_at=now)
     )
     if node.spawn_event is not None:
         spawn_event_for_focus_completion(user_id, node.spawn_event, now)
+    hook_key = node.completion_hook
+    if hook_key is not None:
+        hook = _COMPLETION_HOOKS.get(hook_key)
+        if hook is not None:
+            hook(user_id, now)
     return True

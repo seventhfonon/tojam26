@@ -226,10 +226,8 @@ def _rats_silo_intro_player_resolve(_user_id: str, _tick_time: datetime) -> Even
     )
 
 
-def _rats_silo_intro_after_player_resolve(user_id: str, _tick_time: datetime) -> None:
-    user_row = db.session.get(User, user_id)
-    if user_row is not None:
-        user_row.rat_trappers_unlocked = True
+def _rats_silo_intro_after_player_resolve(_user_id: str, _tick_time: datetime) -> None:
+    """Rat-trapper hiring is unlocked via Focus Tree (Explore Novel Food Sources), not this sweep."""
 
 
 def _rats_silo_intro_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
@@ -367,6 +365,10 @@ def _geiger_exodus_auto_resolve(user_id: str, _tick_time: datetime) -> EventOutc
         if user_row is not None:
             user_row.rumor_exodus_quota_initial = 0
             user_row.rumor_exodus_quota_remaining = 0
+        social = db.session.get(BunkerSocialState, user_id)
+        if social is not None:
+            social.awaiting_post_geiger_exodus_speech = True
+
     return EventOutcome(
         loyalty_delta=0.0,
         message=(
