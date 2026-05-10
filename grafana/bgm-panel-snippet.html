@@ -3,10 +3,9 @@
     python scripts/embed_grafana_bgm.py
   Template vars (hidden constants on each dashboard): ${bgm_url}, ${dashboard_uid}
 
-  Playback pauses only when the browser tab is hidden (visibility API) or when you
-  navigate to another dashboard (singleton). Scrolling the panel off-screen does
-  not pause audio — Grafana has no built-in “sticky panel”; duplicate controls at
-  the top if you want them always visible.
+  Embedded in the Silo Command nav row by embed_grafana_bgm.py (right-aligned).
+  Playback pauses when the browser tab is hidden (visibility API) or when you
+  navigate to another dashboard (singleton).
 -->
 <style>
 .silo-bgm-bar {
@@ -21,6 +20,10 @@
   background: #161b22;
   color: #8b949e;
   font-size: 12px;
+}
+.silo-bgm-bar--nav {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .silo-bgm-bar button {
   padding: 6px 12px;
