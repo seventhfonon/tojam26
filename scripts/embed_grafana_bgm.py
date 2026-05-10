@@ -55,7 +55,13 @@ def main() -> None:
         if not any(v.get("name") == "bgm_url" for v in lst):
             lst.append(_const("bgm_url", BGM_URL))
         panels = data.setdefault("panels", [])
-        if not any(p.get("id") == 200 for p in panels):
+        for p in panels:
+            if p.get("id") == 200 and p.get("type") == "text":
+                opts = p.setdefault("options", {})
+                opts["mode"] = "html"
+                opts["content"] = html
+                break
+        else:
             panels.append(_panel(y, html))
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     print("Updated", len(DASHBOARDS), "dashboards")

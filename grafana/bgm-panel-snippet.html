@@ -2,6 +2,11 @@
   Paste into Grafana Text panel (HTML mode) options.content, OR run:
     python scripts/embed_grafana_bgm.py
   Template vars (hidden constants on each dashboard): ${bgm_url}, ${dashboard_uid}
+
+  Playback pauses only when the browser tab is hidden (visibility API) or when you
+  navigate to another dashboard (singleton). Scrolling the panel off-screen does
+  not pause audio — Grafana has no built-in “sticky panel”; duplicate controls at
+  the top if you want them always visible.
 -->
 <style>
 .silo-bgm-bar {
@@ -56,17 +61,8 @@
   audio.loop = true;
   audio.volume = 0.35;
 
-  var io = null;
-
   function teardown() {
     document.removeEventListener('visibilitychange', onVis);
-    if (io && wrap) {
-      try {
-        io.unobserve(wrap);
-        io.disconnect();
-      } catch (e) {}
-      io = null;
-    }
     try {
       audio.pause();
       audio.removeAttribute('src');
@@ -119,30 +115,6 @@
   }
 
   document.addEventListener('visibilitychange', onVis);
-
-  if (wrap && typeof IntersectionObserver !== 'undefined') {
-    io = new IntersectionObserver(
-      function (entries) {
-        var hit = entries.some(function (en) {
-          return en.isIntersecting && en.intersectionRatio > 0;
-        });
-        if (!hit) {
-          audio.pause();
-        } else {
-          try {
-            if (
-              localStorage.getItem(LS_KEY) === '1' &&
-              !document.hidden
-            ) {
-              tryPlay(false);
-            }
-          } catch (e) {}
-        }
-      },
-      { threshold: [0, 0.01] }
-    );
-    io.observe(wrap);
-  }
 
   if (btn) {
     btn.addEventListener('click', function () {
