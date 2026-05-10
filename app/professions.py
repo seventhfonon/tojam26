@@ -8,14 +8,16 @@ reference the crank/farming rows via FK; each tick we append copies to
 
 from __future__ import annotations
 
-# Stored in DB and shown in Grafana; keep stable when changing UI copy.
-PROFESSION_IDLE = "Idle"
-PROFESSION_POWER_CRANK = "Power crank"
-PROFESSION_FARMING = "Farming"
-PROFESSION_RAT_TRAPPING = "Rat trapping"
-PROFESSION_THEATRE = "Theatre"
-PROFESSION_INVESTIGATION = "Investigation"
+from .strings import (
+    PROFESSION_FARMING,
+    PROFESSION_IDLE,
+    PROFESSION_INVESTIGATION,
+    PROFESSION_POWER_CRANK,
+    PROFESSION_RAT_TRAPPING,
+    PROFESSION_THEATRE,
+)
 
+# Stored in DB and shown in Grafana; keep stable when changing UI copy.
 PROFESSION_REPORT_ORDER: tuple[str, ...] = (
     PROFESSION_POWER_CRANK,
     PROFESSION_FARMING,

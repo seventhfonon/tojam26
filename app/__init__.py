@@ -274,12 +274,35 @@ def _ensure_bunker_social_seed_data() -> None:
         return
     if "bunker_social_state" not in tables:
         return
+    cols = {c["name"] for c in inspect(db.engine).get_columns("bunker_social_state")}
+    insert_cols = [
+        "user_id",
+        "inner_circle_loyalty",
+        "movie_action_count",
+        "speech_action_count",
+    ]
+    select_exprs = ["u.id", "50", "0", "0"]
+    # Include NOT NULL columns when present so INSERT matches ``db.create_all()`` schema
+    # (Python ``default=`` does not always imply a PostgreSQL DEFAULT).
+    optional_literals: tuple[tuple[str, str], ...] = (
+        ("movie_pixel_frame_index", "0"),
+        ("inner_circle_cash", "1000"),
+        ("basket_weaving_hours", "0"),
+        ("awaiting_post_geiger_exodus_speech", "FALSE"),
+        ("fireside_chats_focus_gate_done", "FALSE"),
+        ("temp_job_backfire_seen", "FALSE"),
+    )
+    for col_name, lit in optional_literals:
+        if col_name in cols:
+            insert_cols.append(col_name)
+            select_exprs.append(lit)
+    col_sql = ", ".join(insert_cols)
+    val_sql = ", ".join(select_exprs)
     with db.engine.begin() as conn:
         conn.execute(
             text(
-                "INSERT INTO bunker_social_state "
-                "(user_id, inner_circle_loyalty, movie_action_count, speech_action_count) "
-                "SELECT u.id, 50, 0, 0 FROM users u "
+                f"INSERT INTO bunker_social_state ({col_sql}) "
+                f"SELECT {val_sql} FROM users u "
                 "WHERE NOT EXISTS ("
                 "  SELECT 1 FROM bunker_social_state s WHERE s.user_id = u.id"
                 ")"

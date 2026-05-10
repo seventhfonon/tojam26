@@ -68,6 +68,7 @@ from .events import (
     try_spawn_event,
 )
 from .narrative import NarrativeContext, deliver_pending_narrative_messages
+from .strings import TEST_SYSTEM_MESSAGE_BODY
 
 
 log = logging.getLogger(__name__)
@@ -1543,7 +1544,7 @@ def post_test_message(app: Flask) -> None:
         for user in users:
             db.session.add(SystemMessage(
                 user_id=user.id,
-                body="All systems normal.",
+                body=TEST_SYSTEM_MESSAGE_BODY,
                 timestamp=now,
                 channel=constants.MESSAGE_CHANNEL_BULLETIN,
             ))
