@@ -56,6 +56,7 @@ from .events import (
 )
 from .jobs import (
     current_bad_apple_frame_index,
+    environment_pixel_goat_break_active_at,
     noisy_radiation_display,
     normalize_worker_assignments,
     record_environment_pixel_noise_sample,
@@ -510,12 +511,14 @@ def _create_player() -> User:
         )
     )
     inner_circle.seed_members_for_user_if_needed(user.id)
+    now = datetime.now(timezone.utc)
     record_environment_pixel_noise_sample(
         user.id,
-        datetime.now(timezone.utc),
+        now,
         current_bad_apple_frame_index(),
+        use_reference_image=environment_pixel_goat_break_active_at(now),
     )
-    record_social_movie_pixel_sample(user.id, datetime.now(timezone.utc))
+    record_social_movie_pixel_sample(user.id, now)
     db.session.commit()
     return user
 

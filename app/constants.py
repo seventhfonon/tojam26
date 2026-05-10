@@ -188,6 +188,11 @@ ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE = 0.06
 # Bad Apple clip: PNG sequence under ``app/assets/images/bad_apple`` (``frame_00.png`` …).
 # When all frames exist, the heatmap uses one frame per scheduler tick (see ``game_tick``).
 BAD_APPLE_FRAME_COUNT = 20
+# Between **starts** of static-reference (goat) interruptions on that clip (~mean ± jitter seconds).
+ENVIRONMENT_PIXEL_GOAT_BREAK_INTERVAL_MEAN_SECONDS = 120
+ENVIRONMENT_PIXEL_GOAT_BREAK_INTERVAL_JITTER_SECONDS = 20
+# Length of each interruption (static ``environment_pixel_reference.png`` instead of Bad Apple).
+ENVIRONMENT_PIXEL_GOAT_BREAK_DURATION_SECONDS = 10
 
 # Social dashboard theater heatmap: same strip geometry as environment pixels.
 # Keep ``social_movie_heatmap_history_seconds`` on the Social Grafana dashboard equal to
