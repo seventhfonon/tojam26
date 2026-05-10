@@ -81,18 +81,18 @@
       {
         "name": "bgm_url",
         "type": "constant",
-        "query": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+        "query": "http://localhost:5001/assets/audio/JazzWithAmbience.ogg",
         "hide": 2,
         "current": {
           "selected": true,
-          "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
-          "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+          "text": "http://localhost:5001/assets/audio/JazzWithAmbience.ogg",
+          "value": "http://localhost:5001/assets/audio/JazzWithAmbience.ogg"
         },
         "options": [
           {
             "selected": true,
-            "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
-            "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+            "text": "http://localhost:5001/assets/audio/JazzWithAmbience.ogg",
+            "value": "http://localhost:5001/assets/audio/JazzWithAmbience.ogg"
           }
         ],
         "skipUrlSync": true

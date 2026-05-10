@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SNIPPET = ROOT / "grafana" / "bgm-panel-snippet.html"
 
-BGM_URL = "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+BGM_URL = "http://localhost:5001/assets/audio/JazzWithAmbience.ogg"
 
 DASHBOARDS: list[tuple[str, str, int]] = [
     ("grafana/dashboards/environment.json", "silo-environment", 66),
