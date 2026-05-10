@@ -6,7 +6,7 @@
     "game"
   ],
   "schemaVersion": 39,
-  "version": 34,
+  "version": 36,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -159,13 +159,158 @@
       "gridPos": {
         "x": 0,
         "y": 8,
-        "w": 10,
-        "h": 16
+        "w": 6,
+        "h": 5
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.silo-btn { display: inline-block; padding: 11px 22px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 14px; letter-spacing: 0.4px; font-family: Inter, sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: opacity 0.15s; color: #fff; }\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--orange { background: #e67e00; }\n</style>\n<script>\nfunction _siloEnvSyncInvestigateBtn() {\n  var btn = document.getElementById('_silo_env_investigate_btn');\n  var hint = document.getElementById('_silo_env_inv_hint');\n  if (!btn) return;\n  fetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}&system=environment')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      btn.disabled = !d.can_dispatch;\n      if (hint) hint.textContent = 'Requires ' + d.team_required + ' idle residents (unassigned to crank, farm, or sweep).';\n    })\n    .catch(function() { btn.disabled = true; });\n}\nfunction siloEnvAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloEnvSyncInvestigateBtn();\n  }, 600);\n}\n_siloEnvSyncInvestigateBtn();\nsetInterval(_siloEnvSyncInvestigateBtn, 2000);\n</script>\n<div style=\"padding: 14px 18px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box;\">\n  <p style=\"margin:0 0 10px; color:#c9a227; font-size:13px; font-weight:600;\">Routine compartment sweep</p>\n  <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_env_investigate_btn\" disabled onclick=\"siloEnvAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=environment')\">Send investigation team</button>\n  <p id=\"_silo_env_inv_hint\" style=\"margin:10px 0 0; color:#666; font-size:11px;\"></p>\n</div>"
+        "content": "<style>\n.silo-btn { display: inline-block; padding: 9px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 13px; letter-spacing: 0.3px; font-family: Inter, sans-serif; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: opacity 0.15s; color: #fff; max-width: 100%; box-sizing: border-box; }\n.silo-btn:disabled { opacity: 0.45; cursor: not-allowed; }\n.silo-btn--orange { background: #e67e00; }\n</style>\n<script>\nfunction _siloEnvSyncInvestigateBtn() {\n  var btn = document.getElementById('_silo_env_investigate_btn');\n  var hint = document.getElementById('_silo_env_inv_hint');\n  if (!btn) return;\n  fetch('http://localhost:5001/systems/investigation-dispatch-status?user_id=${user_id}&system=environment')\n    .then(function(r) { return r.json(); })\n    .then(function(d) {\n      btn.disabled = !d.can_dispatch;\n      if (hint) hint.textContent = 'Requires ' + d.team_required + ' idle residents (unassigned to crank, farm, or sweep).';\n    })\n    .catch(function() { btn.disabled = true; });\n}\nfunction siloEnvAction(btn, url) {\n  btn.disabled = true;\n  var f = document.getElementById('_silo_frame');\n  if (!f) {\n    f = document.createElement('iframe');\n    f.id = '_silo_frame';\n    f.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';\n    document.body.appendChild(f);\n  }\n  f.src = url;\n  setTimeout(function() {\n    btn.disabled = false;\n    _siloEnvSyncInvestigateBtn();\n  }, 600);\n}\n_siloEnvSyncInvestigateBtn();\nsetInterval(_siloEnvSyncInvestigateBtn, 2000);\n</script>\n<div style=\"padding: 8px 10px; font-family: Inter, sans-serif; height: 100%; box-sizing: border-box; overflow: auto;\">\n  <p style=\"margin:0 0 6px; color:#c9a227; font-size:12px; font-weight:600; line-height:1.2;\">Routine compartment sweep</p>\n  <button type=\"button\" class=\"silo-btn silo-btn--orange\" id=\"_silo_env_investigate_btn\" disabled onclick=\"siloEnvAction(this, 'http://localhost:5001/action/dispatch-investigation?user_id=${user_id}&system=environment')\">Send investigation team</button>\n  <p id=\"_silo_env_inv_hint\" style=\"margin:6px 0 0; color:#666; font-size:10px; line-height:1.35;\"></p>\n</div>"
       }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Radiation",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 6,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 25
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 75
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, COALESCE(level_display, level) FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Outdoor radiation (rads)",
+      "description": "Outdoor sensor readout (noisy, like a Geiger-style instrument). The orange line marks the threshold below which residents begin reconsidering their stay; gameplay uses the smooth underlying level.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 8,
+        "w": 9,
+        "h": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 2,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "axisPlacement": "auto",
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT timestamp AS time, COALESCE(level_display, level) AS \"Outdoor radiation\" FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
+        }
+      ]
     },
     {
       "id": 27,
@@ -177,10 +322,10 @@
         "uid": "silo-postgres"
       },
       "gridPos": {
-        "x": 10,
+        "x": 15,
         "y": 8,
-        "w": 14,
-        "h": 16
+        "w": 9,
+        "h": 12
       },
       "fieldConfig": {
         "defaults": {
@@ -250,151 +395,6 @@
       "timeFrom": "15m",
       "timeTo": null,
       "timeShift": null
-    },
-    {
-      "id": 2,
-      "type": "timeseries",
-      "title": "Outdoor radiation (rads)",
-      "description": "Outdoor sensor readout (noisy, like a Geiger-style instrument). The orange line marks the threshold below which residents begin reconsidering their stay; gameplay uses the smooth underlying level.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "silo-postgres"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 24,
-        "h": 10
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "min": 0,
-          "decimals": 2,
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 20,
-            "pointSize": 4,
-            "showPoints": "auto",
-            "axisPlacement": "auto",
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "transparent",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 50
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "postgres",
-            "uid": "silo-postgres"
-          },
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT timestamp AS time, COALESCE(level_display, level) AS \"Outdoor radiation\" FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "type": "stat",
-      "title": "Radiation",
-      "datasource": {
-        "type": "postgres",
-        "uid": "silo-postgres"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 34,
-        "w": 24,
-        "h": 5
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 2,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 25
-              },
-              {
-                "color": "orange",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 75
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "postgres",
-            "uid": "silo-postgres"
-          },
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT timestamp AS time, COALESCE(level_display, level) FROM radiation_levels WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid ORDER BY timestamp DESC LIMIT 1"
-        }
-      ]
     }
   ]
 }
