@@ -1247,8 +1247,7 @@ def game_tick(app: Flask) -> None:
                 0.0,
                 adjusted_loyalty - boredom_drag_amt - movie_drag_amt,
             )
-            inner_pen = inner_circle.popularity_loyalty_penalty(user_id)
-            adjusted_loyalty = max(0.0, base_pop_loyalty - inner_pen)
+            adjusted_loyalty = base_pop_loyalty
 
             had_prior_departure_event = user_had_prior_departure_event(user_id)
             had_prior_welcome_message = user_had_prior_welcome_message(user_id)
@@ -1289,6 +1288,7 @@ def game_tick(app: Flask) -> None:
             theatre_draw_ps = 0.0
             theatre_loyalty_bonus = 0.0
             theatre_boredom_bonus = 0.0
+            basket_weaving_loyalty_bonus = 0.0
             if _facilities_ready(readings):
                 normalize_worker_assignments(
                     crank_line,
@@ -1330,6 +1330,21 @@ def game_tick(app: Flask) -> None:
                         0.0,
                         float(boredom_row.boredom) - theatre_boredom_bonus,
                     )
+            social_bw = db.session.get(BunkerSocialState, user_id)
+            if social_bw is not None:
+                social_bw.basket_weaving_hours = constants.basket_weaving_hours_clamped(
+                    social_bw.basket_weaving_hours
+                )
+                if post_pop > 0:
+                    bh = social_bw.basket_weaving_hours
+                    basket_weaving_loyalty_bonus = (
+                        constants.basket_weaving_loyalty_per_second(bh) * elapsed_seconds
+                    )
+                    cash_tick = (
+                        constants.basket_weaving_cash_per_second(bh, post_pop)
+                        * elapsed_seconds
+                    )
+                    social_bw.inner_circle_cash += cash_tick
             record_bunker_profession_snapshots(
                 user_id, post_pop, readings, tick_time
             )
@@ -1402,14 +1417,16 @@ def game_tick(app: Flask) -> None:
                     + auto_loyalty_adj
                     + sermon_loyalty_bonus
                     + theatre_loyalty_bonus
+                    + basket_weaving_loyalty_bonus
                     + fireside_loyalty_tick
                     + inner_circle_loyalty_bonus,
                 ),
             )
             record_loyalty_sample(user_id, final_loyalty, tick_time)
-            inner_circle.drift_member_loyalties(
+            inner_circle.tick_member_psyche(
                 user_id,
-                base_pop_loyalty,
+                final_loyalty,
+                working_doubt,
                 elapsed_seconds,
                 tick_time,
             )

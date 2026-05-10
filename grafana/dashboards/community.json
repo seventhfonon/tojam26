@@ -6,7 +6,7 @@
     "game"
   ],
   "schemaVersion": 39,
-  "version": 16,
+  "version": 17,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -58,6 +58,44 @@
           }
         ],
         "skipUrlSync": true
+      },
+      {
+        "name": "dashboard_uid",
+        "type": "constant",
+        "query": "silo-community",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "silo-community",
+          "value": "silo-community"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "silo-community",
+            "value": "silo-community"
+          }
+        ],
+        "skipUrlSync": true
+      },
+      {
+        "name": "bgm_url",
+        "type": "constant",
+        "query": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+          "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+            "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+          }
+        ],
+        "skipUrlSync": true
       }
     ]
   },
@@ -75,7 +113,7 @@
       },
       "options": {
         "mode": "html",
-        "content": "<style id=\"silo-community-movie-heatmap-hide-axis-labels\">\n[data-panelid=\"47\"] .u-axis text,\n[data-panelid=\"47\"] .u-axis .u-value,\n[data-panel-id=\"47\"] .u-axis text,\n[data-panel-id=\"47\"] .u-axis .u-value {\n  display: none !important;\n}\n</style>\n<script>\n(function siloSquareHeatmapPanel47() {\n  function findPanels() {\n    var roots = [];\n    ['[data-panelid=\"47\"]', '[data-panel-id=\"47\"]'].forEach(function(sel) {\n      document.querySelectorAll(sel).forEach(function(el) {\n        if (roots.indexOf(el) === -1) roots.push(el);\n      });\n    });\n    if (!roots.length) {\n      document.querySelectorAll('section[aria-label*=\"Movie screen\"]').forEach(function(el) {\n        roots.push(el);\n      });\n    }\n    return roots;\n  }\n\n  function tick() {\n    findPanels().forEach(function(root) {\n      var uplot = root.querySelector('.uplot');\n      if (!uplot) return;\n\n      var inner = root.querySelector('[data-testid*=\"panel-content\"]')\n        || root.querySelector('[data-testid*=\"Panel content\"]')\n        || root.querySelector('[class*=\"panel-content\"]')\n        || root;\n\n      var box = inner.getBoundingClientRect();\n      var rawW = Math.max(box.width - 28, 80);\n      var rawH = Math.max(box.height - 28, 80);\n      var S = Math.floor(Math.min(rawW, rawH));\n      if (S < 80) return;\n\n      var sx = S / rawW;\n      var sy = S / rawH;\n\n      var clip = uplot.closest('[data-testid*=\"viz-layout\"]') || uplot.parentElement;\n      if (!clip) return;\n\n      clip.style.setProperty('overflow', 'hidden', 'important');\n      clip.style.setProperty('width', S + 'px', 'important');\n      clip.style.setProperty('height', S + 'px', 'important');\n      clip.style.setProperty('margin-left', 'auto', 'important');\n      clip.style.setProperty('margin-right', 'auto', 'important');\n      clip.style.setProperty('box-sizing', 'border-box', 'important');\n\n      uplot.style.transformOrigin = 'top left';\n      uplot.style.setProperty('transform', 'scale(' + sx + ',' + sy + ')', 'important');\n    });\n    requestAnimationFrame(tick);\n  }\n\n  requestAnimationFrame(tick);\n})();\n</script>\n<script>\n<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u2622&nbsp; Environment&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-inner-circle?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc51&nbsp; Inner Circle&nbsp;\u2197</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\ud83d\udc65&nbsp; Community</span></div>"
+        "content": "<style id=\"silo-community-movie-heatmap-hide-axis-labels\">\n[data-panelid=\"47\"] .u-axis text,\n[data-panelid=\"47\"] .u-axis .u-value,\n[data-panel-id=\"47\"] .u-axis text,\n[data-panel-id=\"47\"] .u-axis .u-value {\n  display: none !important;\n}\n</style>\n<script>\n(function siloSquareHeatmapPanel47() {\n  function findPanels() {\n    var roots = [];\n    ['[data-panelid=\"47\"]', '[data-panel-id=\"47\"]'].forEach(function(sel) {\n      document.querySelectorAll(sel).forEach(function(el) {\n        if (roots.indexOf(el) === -1) roots.push(el);\n      });\n    });\n    if (!roots.length) {\n      document.querySelectorAll('section[aria-label*=\"Movie screen\"]').forEach(function(el) {\n        roots.push(el);\n      });\n    }\n    return roots;\n  }\n\n  function tick() {\n    findPanels().forEach(function(root) {\n      var uplot = root.querySelector('.uplot');\n      if (!uplot) return;\n\n      var inner = root.querySelector('[data-testid*=\"panel-content\"]')\n        || root.querySelector('[data-testid*=\"Panel content\"]')\n        || root.querySelector('[class*=\"panel-content\"]')\n        || root;\n\n      var box = inner.getBoundingClientRect();\n      var rawW = Math.max(box.width - 28, 80);\n      var rawH = Math.max(box.height - 28, 80);\n      var S = Math.floor(Math.min(rawW, rawH));\n      if (S < 80) return;\n\n      var sx = S / rawW;\n      var sy = S / rawH;\n\n      var clip = uplot.closest('[data-testid*=\"viz-layout\"]') || uplot.parentElement;\n      if (!clip) return;\n\n      clip.style.setProperty('overflow', 'hidden', 'important');\n      clip.style.setProperty('width', S + 'px', 'important');\n      clip.style.setProperty('height', S + 'px', 'important');\n      clip.style.setProperty('margin-left', 'auto', 'important');\n      clip.style.setProperty('margin-right', 'auto', 'important');\n      clip.style.setProperty('box-sizing', 'border-box', 'important');\n\n      uplot.style.transformOrigin = 'top left';\n      uplot.style.setProperty('transform', 'scale(' + sx + ',' + sy + ')', 'important');\n    });\n    requestAnimationFrame(tick);\n  }\n\n  requestAnimationFrame(tick);\n})();\n</script>\n<script>\n<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u2622&nbsp; Environment&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-inner-circle?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc51&nbsp; Inner Circle&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-focus-tree?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf33&nbsp; Focus Tree&nbsp;\u2197</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(31,111,235,0.15);border:1px solid #1f6feb;color:#58a6ff;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\ud83d\udc65&nbsp; Community</span></div>"
       }
     },
     {
@@ -2476,6 +2514,243 @@
           "rawSql": "SELECT NOW() AS time, 15.0::double precision AS boredom_relief_per_play\nWHERE '$user_id' <> ''"
         }
       ]
+    },
+    {
+      "id": 108,
+      "type": "row",
+      "title": "Team Building Basket Weaving Class",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [],
+      "datasource": null
+    },
+    {
+      "id": 109,
+      "type": "text",
+      "title": "",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 51,
+        "w": 12,
+        "h": 4
+      },
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.bw-wrap{border:1px solid #30363d;border-radius:8px;padding:10px 12px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:6px;font-family:Inter,sans-serif;}\n.bw-head{font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.3px;text-transform:uppercase}\n.bw-sub{font-size:10px;color:#6e7681;line-height:1.35}\n.bw-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}\n.bw-val{font-size:18px;font-weight:700;color:#58a6ff}\n.silo-btn{display:inline-block;padding:8px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);color:#fff}\n.silo-btn:disabled{opacity:.45;cursor:not-allowed}\n.silo-btn--teal{background:#238636}\n.silo-btn--gold{background:#9e6a03}\n</style>\n<div class=\"bw-wrap\">\n<div class=\"bw-head\">Mandatory weaving policy</div>\n<div class=\"bw-sub\">Everyone attends \u2014 raise hours for more covert sales income; loyalty gain per tick is higher when hours stay low.</div>\n<div class=\"bw-row\"><span style=\"color:#8b949e;font-size:11px\">Hours per person</span><span class=\"bw-val\" id=\"_silo_bw_hours\">\u2014</span></div>\n<div class=\"bw-row\"><button type=\"button\" class=\"silo-btn silo-btn--teal\" id=\"_silo_bw_more\" disabled>+ Hour</button><button type=\"button\" class=\"silo-btn silo-btn--gold\" id=\"_silo_bw_less\" disabled>- Hour</button></div>\n</div>\n<script>\n(function(){\nvar U='${user_id}';\nvar lh=document.getElementById('_silo_bw_hours');\nvar bm=document.getElementById('_silo_bw_more');\nvar bl=document.getElementById('_silo_bw_less');\nfunction sync(){\nif(!U){if(lh)lh.textContent='\u2014';return;}\nvar enc=encodeURIComponent(U);\nfetch('http://localhost:5001/socials/action-status?user_id='+enc).then(function(r){return r.json();}).then(function(d){\nif(lh) lh.textContent=String(d.basket_weaving_mandatory_hours);\nvar mx=d.basket_weaving_hours_max!=null?d.basket_weaving_hours_max:4;\nvar ok=d.can_adjust_basket_weaving_hours;\nvar h=d.basket_weaving_mandatory_hours||0;\nif(bm) bm.disabled=!ok||h>=mx;\nif(bl) bl.disabled=!ok||h<=0;\n}).catch(function(){});\n}\nfunction adj(btn,delta){\nif(!U)return;\nbtn.disabled=true;\nvar url='http://localhost:5001/action/adjust-basket-weaving-hours?user_id='+encodeURIComponent(U)+'&delta='+delta;\nvar f=document.getElementById('_silo_frame');\nif(!f){f=document.createElement('iframe');f.id='_silo_frame';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}\nf.src=url;\nsetTimeout(function(){btn.disabled=false;sync();},500);\n}\nif(bm) bm.addEventListener('click',function(){adj(bm,1);});\nif(bl) bl.addEventListener('click',function(){adj(bl,-1);});\nsync();\nsetInterval(sync,2000);\n})();\n</script>"
+      }
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 110,
+      "title": "Mandatory hrs/person",
+      "description": "Stored on bunker_social_state.basket_weaving_hours (0\u20134).",
+      "gridPos": {
+        "x": 12,
+        "y": 51,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  LEAST(4, GREATEST(0, COALESCE((SELECT basket_weaving_hours FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1), 0)))::double precision AS hours\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 4,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.0001
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 111,
+      "title": "BW loyalty (per sec)",
+      "description": "Population-independent loyalty from basket weaving (see BASKET_WEAVING_LOYALTY_PER_SECOND).",
+      "gridPos": {
+        "x": 16,
+        "y": 51,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    CASE LEAST(4, GREATEST(0, COALESCE((SELECT basket_weaving_hours FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1), 0)))\n      WHEN 0 THEN 0::double precision\n      WHEN 1 THEN 0.09::double precision\n      WHEN 2 THEN 0.065::double precision\n      WHEN 3 THEN 0.045::double precision\n      WHEN 4 THEN 0.028::double precision\n      ELSE 0::double precision\n    END\n  ) AS loyalty_per_second\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "silo-postgres"
+      },
+      "transparent": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 4,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-orange",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.0001
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "pluginVersion": "11.2.0",
+      "id": 112,
+      "title": "BW cash (per sec)",
+      "description": "Total inner_circle_cash rate = population \u00d7 per-person rate by hours (BASKET_WEAVING_CASH_PER_PERSON_PER_SECOND).",
+      "gridPos": {
+        "x": 20,
+        "y": 51,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "silo-postgres"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT NOW() AS time,\n  (\n    COALESCE((SELECT bp.count FROM bunker_population bp WHERE bp.user_id = '$user_id'::uuid ORDER BY bp.timestamp DESC LIMIT 1), 0)::double precision\n    *\n    (\n      CASE LEAST(4, GREATEST(0, COALESCE((SELECT basket_weaving_hours FROM bunker_social_state WHERE user_id = '$user_id'::uuid LIMIT 1), 0)))\n        WHEN 0 THEN 0::double precision\n        WHEN 1 THEN 0.001::double precision\n        WHEN 2 THEN 0.002::double precision\n        WHEN 3 THEN 0.003::double precision\n        WHEN 4 THEN 0.004::double precision\n        ELSE 0::double precision\n      END\n    )\n  ) AS cash_per_second\nWHERE '$user_id' <> ''"
+        }
+      ]
+    },
+    {
+      "id": 200,
+      "type": "text",
+      "title": "BGM",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "html",
+        "content": "<!--\n  Paste into Grafana Text panel (HTML mode) options.content, OR run:\n    python scripts/embed_grafana_bgm.py\n  Template vars (hidden constants on each dashboard): ${bgm_url}, ${dashboard_uid}\n-->\n<style>\n.silo-bgm-bar {\n  font-family: Inter, sans-serif;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 6px 10px;\n  box-sizing: border-box;\n  border: 1px solid #30363d;\n  border-radius: 6px;\n  background: #161b22;\n  color: #8b949e;\n  font-size: 12px;\n}\n.silo-bgm-bar button {\n  padding: 6px 12px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 12px;\n  font-family: Inter, sans-serif;\n  background: #8957e5;\n  color: #fff;\n  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);\n}\n.silo-bgm-bar button:disabled {\n  opacity: 0.45;\n  cursor: not-allowed;\n}\n</style>\n<div id=\"_silo_bgm_wrap\" class=\"silo-bgm-bar\">\n  <button type=\"button\" id=\"_silo_bgm_btn\">Enable bunker audio</button>\n  <span id=\"_silo_bgm_status\">Optional bunker audio</span>\n</div>\n<script>\n(function siloBgmDashAudio() {\n  var TRACK = ('${bgm_url}' || '').trim();\n  var DASH = ('${dashboard_uid}' || '').trim();\n  var wrap = document.getElementById('_silo_bgm_wrap');\n  var btn = document.getElementById('_silo_bgm_btn');\n  var statusEl = document.getElementById('_silo_bgm_status');\n\n  if (!TRACK) {\n    if (wrap) wrap.style.display = 'none';\n    return;\n  }\n\n  var LS_KEY = 'silo_bgm_enabled';\n  var audio = new Audio(TRACK);\n  audio.loop = true;\n  audio.volume = 0.35;\n\n  var io = null;\n\n  function teardown() {\n    document.removeEventListener('visibilitychange', onVis);\n    if (io && wrap) {\n      try {\n        io.unobserve(wrap);\n        io.disconnect();\n      } catch (e) {}\n      io = null;\n    }\n    try {\n      audio.pause();\n      audio.removeAttribute('src');\n      audio.load();\n    } catch (e) {}\n  }\n\n  var api = {\n    dash: DASH,\n    destroy: function () {\n      teardown();\n      if (window.__SILO_BGM__ === api) {\n        window.__SILO_BGM__ = null;\n      }\n    },\n    audio: audio,\n  };\n\n  var prev = window.__SILO_BGM__;\n  if (prev && typeof prev.destroy === 'function') {\n    prev.destroy();\n  }\n  window.__SILO_BGM__ = api;\n\n  function onVis() {\n    if (document.hidden) {\n      audio.pause();\n    } else {\n      try {\n        if (localStorage.getItem(LS_KEY) === '1') {\n          tryPlay(false);\n        }\n      } catch (e) {}\n    }\n  }\n\n  function tryPlay(fromUser) {\n    var p = audio.play();\n    if (p !== undefined && typeof p.then === 'function') {\n      p.then(function () {\n        if (btn) btn.style.display = 'none';\n        if (statusEl) statusEl.textContent = 'Playing';\n      }).catch(function () {\n        if (btn) btn.style.display = '';\n        if (statusEl && !fromUser) {\n          statusEl.textContent = 'Tap Enable to play';\n        }\n      });\n    }\n  }\n\n  document.addEventListener('visibilitychange', onVis);\n\n  if (wrap && typeof IntersectionObserver !== 'undefined') {\n    io = new IntersectionObserver(\n      function (entries) {\n        var hit = entries.some(function (en) {\n          return en.isIntersecting && en.intersectionRatio > 0;\n        });\n        if (!hit) {\n          audio.pause();\n        } else {\n          try {\n            if (\n              localStorage.getItem(LS_KEY) === '1' &&\n              !document.hidden\n            ) {\n              tryPlay(false);\n            }\n          } catch (e) {}\n        }\n      },\n      { threshold: [0, 0.01] }\n    );\n    io.observe(wrap);\n  }\n\n  if (btn) {\n    btn.addEventListener('click', function () {\n      try {\n        localStorage.setItem(LS_KEY, '1');\n      } catch (e) {}\n      tryPlay(true);\n    });\n  }\n\n  try {\n    if (localStorage.getItem(LS_KEY) === '1') {\n      tryPlay(false);\n    }\n  } catch (e) {}\n})();\n</script>\n"
+      }
     }
   ]
 }

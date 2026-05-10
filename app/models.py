@@ -169,6 +169,10 @@ class User(db.Model):
         cascade="all, delete-orphan",
         order_by="InnerCircleMember.slot_index",
     )
+    focus_tree_completions: Mapped[list["FocusTreeCompletion"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.id}>"
@@ -350,6 +354,8 @@ class BunkerSocialState(db.Model):
     )
     #: Off-books currency for Inner Circle actions (temp jobs, etc.).
     inner_circle_cash: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    #: Mandatory basket-weaving hours per resident (0..``constants.BASKET_WEAVING_HOURS_MAX``).
+    basket_weaving_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     user: Mapped[User] = relationship(back_populates="bunker_social_state")
 
@@ -373,6 +379,10 @@ class InnerCircleMember(db.Model):
     slot_index: Mapped[int] = mapped_column(Integer, primary_key=True)
     display_name: Mapped[str] = mapped_column(String(128), nullable=False)
     loyalty: Mapped[float] = mapped_column(Float, nullable=False)
+    #: Instantaneous stress (0 calm .. 100 furious); bunker loyalty & doubt pull this around.
+    frustration: Mapped[float] = mapped_column(Float, nullable=False)
+    #: Static agreeableness (0 prickly .. 100 accommodating); slows loyalty tracking frustration.
+    disposition: Mapped[float] = mapped_column(Float, nullable=False)
     popularity: Mapped[float] = mapped_column(Float, nullable=False)
     task_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     task_started_at: Mapped[Optional[datetime]] = mapped_column(
@@ -872,6 +882,29 @@ class PlayerActiveEvent(db.Model):
             f"<PlayerActiveEvent id={self.id!r} user={self.user_id} kind={self.kind!r} "
             f"system={self.system!r} until={self.auto_resolve_at!r}>"
         )
+
+
+class FocusTreeCompletion(db.Model):
+    """Player-completed node on the Grafana Focus Tree dashboard."""
+
+    __tablename__ = "focus_tree_completions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "node_id", name="uq_focus_tree_user_node"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    node_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="focus_tree_completions")
 
 
 class UserNarrativeDelivery(db.Model):

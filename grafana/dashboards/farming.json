@@ -6,7 +6,7 @@
     "game"
   ],
   "schemaVersion": 39,
-  "version": 25,
+  "version": 26,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -38,6 +38,44 @@
         "options": [],
         "hide": 2,
         "skipUrlSync": false
+      },
+      {
+        "name": "dashboard_uid",
+        "type": "constant",
+        "query": "silo-farming",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "silo-farming",
+          "value": "silo-farming"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "silo-farming",
+            "value": "silo-farming"
+          }
+        ],
+        "skipUrlSync": true
+      },
+      {
+        "name": "bgm_url",
+        "type": "constant",
+        "query": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+          "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+            "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+          }
+        ],
+        "skipUrlSync": true
       }
     ]
   },
@@ -55,7 +93,7 @@
       },
       "options": {
         "mode": "html",
-        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u2622&nbsp; Environment&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(46,160,67,0.15);border:1px solid #2ea043;color:#56d364;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming</span><a href=\"http://localhost:3000/d/silo-inner-circle?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc51&nbsp; Inner Circle&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-community?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc65&nbsp; Community&nbsp;\u2197</a></div>"
+        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u2622&nbsp; Environment&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(46,160,67,0.15);border:1px solid #2ea043;color:#56d364;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming</span><a href=\"http://localhost:3000/d/silo-inner-circle?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc51&nbsp; Inner Circle&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-focus-tree?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf33&nbsp; Focus Tree&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-community?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc65&nbsp; Community&nbsp;\u2197</a></div>"
       }
     },
     {
@@ -1019,6 +1057,22 @@
           "rawSql": "SELECT timestamp AS time, production_per_second AS \"Production per s\" FROM food_reserves WHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND $__timeFilter(timestamp) ORDER BY timestamp"
         }
       ]
+    },
+    {
+      "id": 200,
+      "type": "text",
+      "title": "BGM",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "html",
+        "content": "<!--\n  Paste into Grafana Text panel (HTML mode) options.content, OR run:\n    python scripts/embed_grafana_bgm.py\n  Template vars (hidden constants on each dashboard): ${bgm_url}, ${dashboard_uid}\n-->\n<style>\n.silo-bgm-bar {\n  font-family: Inter, sans-serif;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 6px 10px;\n  box-sizing: border-box;\n  border: 1px solid #30363d;\n  border-radius: 6px;\n  background: #161b22;\n  color: #8b949e;\n  font-size: 12px;\n}\n.silo-bgm-bar button {\n  padding: 6px 12px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 12px;\n  font-family: Inter, sans-serif;\n  background: #8957e5;\n  color: #fff;\n  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);\n}\n.silo-bgm-bar button:disabled {\n  opacity: 0.45;\n  cursor: not-allowed;\n}\n</style>\n<div id=\"_silo_bgm_wrap\" class=\"silo-bgm-bar\">\n  <button type=\"button\" id=\"_silo_bgm_btn\">Enable bunker audio</button>\n  <span id=\"_silo_bgm_status\">Optional bunker audio</span>\n</div>\n<script>\n(function siloBgmDashAudio() {\n  var TRACK = ('${bgm_url}' || '').trim();\n  var DASH = ('${dashboard_uid}' || '').trim();\n  var wrap = document.getElementById('_silo_bgm_wrap');\n  var btn = document.getElementById('_silo_bgm_btn');\n  var statusEl = document.getElementById('_silo_bgm_status');\n\n  if (!TRACK) {\n    if (wrap) wrap.style.display = 'none';\n    return;\n  }\n\n  var LS_KEY = 'silo_bgm_enabled';\n  var audio = new Audio(TRACK);\n  audio.loop = true;\n  audio.volume = 0.35;\n\n  var io = null;\n\n  function teardown() {\n    document.removeEventListener('visibilitychange', onVis);\n    if (io && wrap) {\n      try {\n        io.unobserve(wrap);\n        io.disconnect();\n      } catch (e) {}\n      io = null;\n    }\n    try {\n      audio.pause();\n      audio.removeAttribute('src');\n      audio.load();\n    } catch (e) {}\n  }\n\n  var api = {\n    dash: DASH,\n    destroy: function () {\n      teardown();\n      if (window.__SILO_BGM__ === api) {\n        window.__SILO_BGM__ = null;\n      }\n    },\n    audio: audio,\n  };\n\n  var prev = window.__SILO_BGM__;\n  if (prev && typeof prev.destroy === 'function') {\n    prev.destroy();\n  }\n  window.__SILO_BGM__ = api;\n\n  function onVis() {\n    if (document.hidden) {\n      audio.pause();\n    } else {\n      try {\n        if (localStorage.getItem(LS_KEY) === '1') {\n          tryPlay(false);\n        }\n      } catch (e) {}\n    }\n  }\n\n  function tryPlay(fromUser) {\n    var p = audio.play();\n    if (p !== undefined && typeof p.then === 'function') {\n      p.then(function () {\n        if (btn) btn.style.display = 'none';\n        if (statusEl) statusEl.textContent = 'Playing';\n      }).catch(function () {\n        if (btn) btn.style.display = '';\n        if (statusEl && !fromUser) {\n          statusEl.textContent = 'Tap Enable to play';\n        }\n      });\n    }\n  }\n\n  document.addEventListener('visibilitychange', onVis);\n\n  if (wrap && typeof IntersectionObserver !== 'undefined') {\n    io = new IntersectionObserver(\n      function (entries) {\n        var hit = entries.some(function (en) {\n          return en.isIntersecting && en.intersectionRatio > 0;\n        });\n        if (!hit) {\n          audio.pause();\n        } else {\n          try {\n            if (\n              localStorage.getItem(LS_KEY) === '1' &&\n              !document.hidden\n            ) {\n              tryPlay(false);\n            }\n          } catch (e) {}\n        }\n      },\n      { threshold: [0, 0.01] }\n    );\n    io.observe(wrap);\n  }\n\n  if (btn) {\n    btn.addEventListener('click', function () {\n      try {\n        localStorage.setItem(LS_KEY, '1');\n      } catch (e) {}\n      tryPlay(true);\n    });\n  }\n\n  try {\n    if (localStorage.getItem(LS_KEY) === '1') {\n      tryPlay(false);\n    }\n  } catch (e) {}\n})();\n</script>\n"
+      }
     }
   ]
 }

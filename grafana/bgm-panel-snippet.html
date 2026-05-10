@@ -1,0 +1,162 @@
+<!--
+  Paste into Grafana Text panel (HTML mode) options.content, OR run:
+    python scripts/embed_grafana_bgm.py
+  Template vars (hidden constants on each dashboard): ${bgm_url}, ${dashboard_uid}
+-->
+<style>
+.silo-bgm-bar {
+  font-family: Inter, sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #161b22;
+  color: #8b949e;
+  font-size: 12px;
+}
+.silo-bgm-bar button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  font-family: Inter, sans-serif;
+  background: #8957e5;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.silo-bgm-bar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+</style>
+<div id="_silo_bgm_wrap" class="silo-bgm-bar">
+  <button type="button" id="_silo_bgm_btn">Enable bunker audio</button>
+  <span id="_silo_bgm_status">Optional bunker audio</span>
+</div>
+<script>
+(function siloBgmDashAudio() {
+  var TRACK = ('${bgm_url}' || '').trim();
+  var DASH = ('${dashboard_uid}' || '').trim();
+  var wrap = document.getElementById('_silo_bgm_wrap');
+  var btn = document.getElementById('_silo_bgm_btn');
+  var statusEl = document.getElementById('_silo_bgm_status');
+
+  if (!TRACK) {
+    if (wrap) wrap.style.display = 'none';
+    return;
+  }
+
+  var LS_KEY = 'silo_bgm_enabled';
+  var audio = new Audio(TRACK);
+  audio.loop = true;
+  audio.volume = 0.35;
+
+  var io = null;
+
+  function teardown() {
+    document.removeEventListener('visibilitychange', onVis);
+    if (io && wrap) {
+      try {
+        io.unobserve(wrap);
+        io.disconnect();
+      } catch (e) {}
+      io = null;
+    }
+    try {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    } catch (e) {}
+  }
+
+  var api = {
+    dash: DASH,
+    destroy: function () {
+      teardown();
+      if (window.__SILO_BGM__ === api) {
+        window.__SILO_BGM__ = null;
+      }
+    },
+    audio: audio,
+  };
+
+  var prev = window.__SILO_BGM__;
+  if (prev && typeof prev.destroy === 'function') {
+    prev.destroy();
+  }
+  window.__SILO_BGM__ = api;
+
+  function onVis() {
+    if (document.hidden) {
+      audio.pause();
+    } else {
+      try {
+        if (localStorage.getItem(LS_KEY) === '1') {
+          tryPlay(false);
+        }
+      } catch (e) {}
+    }
+  }
+
+  function tryPlay(fromUser) {
+    var p = audio.play();
+    if (p !== undefined && typeof p.then === 'function') {
+      p.then(function () {
+        if (btn) btn.style.display = 'none';
+        if (statusEl) statusEl.textContent = 'Playing';
+      }).catch(function () {
+        if (btn) btn.style.display = '';
+        if (statusEl && !fromUser) {
+          statusEl.textContent = 'Tap Enable to play';
+        }
+      });
+    }
+  }
+
+  document.addEventListener('visibilitychange', onVis);
+
+  if (wrap && typeof IntersectionObserver !== 'undefined') {
+    io = new IntersectionObserver(
+      function (entries) {
+        var hit = entries.some(function (en) {
+          return en.isIntersecting && en.intersectionRatio > 0;
+        });
+        if (!hit) {
+          audio.pause();
+        } else {
+          try {
+            if (
+              localStorage.getItem(LS_KEY) === '1' &&
+              !document.hidden
+            ) {
+              tryPlay(false);
+            }
+          } catch (e) {}
+        }
+      },
+      { threshold: [0, 0.01] }
+    );
+    io.observe(wrap);
+  }
+
+  if (btn) {
+    btn.addEventListener('click', function () {
+      try {
+        localStorage.setItem(LS_KEY, '1');
+      } catch (e) {}
+      tryPlay(true);
+    });
+  }
+
+  try {
+    if (localStorage.getItem(LS_KEY) === '1') {
+      tryPlay(false);
+    }
+  } catch (e) {}
+})();
+</script>

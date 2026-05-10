@@ -24,16 +24,27 @@ import logging
 import math
 import random
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
-from flask import Blueprint, current_app, jsonify, make_response, redirect, request
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    jsonify,
+    make_response,
+    redirect,
+    request,
+    send_from_directory,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from .extensions import db
 from . import constants
 from . import inner_circle
+from .focus_tree import focus_tree_status_payload, try_complete_focus
 from .events import (
     EventDefinition,
     combined_rats_consumption_per_second_for_trappers,
@@ -64,6 +75,7 @@ from .models import (
     BunkerTheatreSystem,
     EnergyReserve,
     FoodReserve,
+    InnerCircleMember,
     PlayerMovieExhaustion,
     RadiationLevel,
     SystemMessage,
@@ -82,6 +94,29 @@ from .social_flavor import NEGATIVE_COUNCIL_MESSAGES, POSITIVE_COUNCIL_MESSAGES
 
 log = logging.getLogger(__name__)
 bp = Blueprint("main", __name__)
+
+_ALLOWED_GAME_AUDIO_SUFFIXES = frozenset({".mp3", ".ogg", ".wav", ".m4a"})
+_GAME_AUDIO_DIR = Path(__file__).resolve().parent / "assets" / "audio"
+
+
+@bp.get("/assets/audio/<filename>")
+def serve_game_audio(filename: str):
+    """Serve loopable game audio for Grafana Text-panel `<audio>` tags."""
+    if (
+        not filename
+        or filename.startswith(".")
+        or "/" in filename
+        or "\\" in filename
+    ):
+        abort(404)
+    suf = Path(filename).suffix.lower()
+    if suf not in _ALLOWED_GAME_AUDIO_SUFFIXES:
+        abort(404)
+    path = _GAME_AUDIO_DIR / filename
+    if not path.is_file():
+        abort(404)
+    mt = "audio/mpeg" if suf == ".mp3" else None
+    return send_from_directory(_GAME_AUDIO_DIR, filename, mimetype=mt)
 
 
 def _seed_bunker_facilities(user: User) -> None:
@@ -846,6 +881,42 @@ def action_adjust_theatre():
     return _action_response(user.id)
 
 
+@bp.route("/action/adjust-basket-weaving-hours")
+def action_adjust_basket_weaving_hours():
+    """Raise or lower mandatory basket-weaving hours per resident (0..max)."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
+    social = db.session.get(BunkerSocialState, user.id)
+    if social is None:
+        return _action_response(user.id)
+
+    try:
+        delta = int(request.args.get("delta", 0))
+    except (ValueError, TypeError):
+        delta = 0
+
+    if delta == 0:
+        return _action_response(user.id)
+
+    cur = constants.basket_weaving_hours_clamped(social.basket_weaving_hours)
+    social.basket_weaving_hours = constants.basket_weaving_hours_clamped(cur + delta)
+    db.session.commit()
+    log.info(
+        "adjust basket weaving hours: user=%s delta=%+d hours=%d",
+        user.id,
+        delta,
+        social.basket_weaving_hours,
+    )
+
+    return _action_response(user.id)
+
+
 @bp.route("/action/farming-plot")
 def action_farming_plot():
     """Plant / harvest one bay; harvest food scales with mean farm workers during that growth."""
@@ -1126,10 +1197,47 @@ def _inner_circle_slot_query() -> int | None:
 def inner_circle_http_status():
     user = _identify_player()
     if user is None:
-        return jsonify({"error": "no_player"}), 400
+        resp = jsonify({"error": "no_player"})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 400
     now = datetime.now(timezone.utc)
     _get_or_create_social_state(user.id)
-    return jsonify(inner_circle.inner_circle_status_payload(user.id, now))
+    resp = jsonify(inner_circle.inner_circle_status_payload(user.id, now))
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@bp.route("/inner-circle/psyche-swatch")
+def inner_circle_psyche_swatch():
+    """PNG-less RGB preview for Grafana Text panels (``<img>`` avoids fetch/CORS)."""
+    user = _identify_player()
+    try:
+        slot = int(request.args.get("slot", ""))
+    except (TypeError, ValueError):
+        slot = -1
+
+    fill = "#30363d"
+    if user is not None and 0 <= slot < constants.INNER_CIRCLE_MEMBER_COUNT:
+        inner_circle.seed_members_for_user_if_needed(user.id)
+        row = db.session.get(InnerCircleMember, (user.id, slot))
+        if row is not None:
+            r_ch = max(0, min(255, int(round(float(row.frustration) * 2.55))))
+            g_ch = max(0, min(255, int(round(float(row.loyalty) * 2.55))))
+            b_ch = max(0, min(255, int(round(float(row.disposition) * 2.55))))
+            fill = f"rgb({r_ch},{g_ch},{b_ch})"
+
+    svg = (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" "
+        "width=\"320\" height=\"160\" viewBox=\"0 0 320 160\">"
+        f"<rect width=\"320\" height=\"160\" fill=\"{fill}\"/>"
+        "</svg>"
+    )
+    resp = make_response(svg)
+    resp.mimetype = "image/svg+xml"
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
 
 
 @bp.route("/action/inner-circle/grant-luxuries")
@@ -1360,6 +1468,12 @@ def socials_action_status():
     theatre_play_title = ""
     theatre_status_ui = "idle"
 
+    basket_mandatory_hours = 0
+    basket_population = 0
+    basket_loyalty_ps = 0.0
+    basket_cash_ps = 0.0
+    basket_can_adjust = False
+
     can_show_movie_flag = False
 
     if user is not None:
@@ -1433,6 +1547,27 @@ def socials_action_status():
         and fireside_cd_rem == 0
     )
 
+    if user is not None:
+        latest_pop_basket = db.session.scalars(
+            select(BunkerPopulation)
+            .where(BunkerPopulation.user_id == user.id)
+            .order_by(BunkerPopulation.timestamp.desc())
+            .limit(1)
+        ).first()
+        basket_population = latest_pop_basket.count if latest_pop_basket is not None else 0
+        soc_bw = db.session.get(BunkerSocialState, user.id)
+        if soc_bw is not None:
+            basket_mandatory_hours = constants.basket_weaving_hours_clamped(
+                soc_bw.basket_weaving_hours
+            )
+        basket_loyalty_ps = constants.basket_weaving_loyalty_per_second(
+            basket_mandatory_hours
+        )
+        basket_cash_ps = constants.basket_weaving_cash_per_second(
+            basket_mandatory_hours, basket_population
+        )
+        basket_can_adjust = not actions_locked and not sermon_active
+
     resp = jsonify(
         {
             "actions_locked": actions_locked,
@@ -1477,6 +1612,12 @@ def socials_action_status():
             "theatre_boredom_relief_per_play": float(
                 constants.THEATRE_BOREDOM_RELIEF_PER_PLAY
             ),
+            "basket_weaving_mandatory_hours": basket_mandatory_hours,
+            "basket_weaving_hours_max": int(constants.BASKET_WEAVING_HOURS_MAX),
+            "basket_weaving_population": basket_population,
+            "basket_weaving_loyalty_per_second": float(basket_loyalty_ps),
+            "basket_weaving_cash_per_second": float(basket_cash_ps),
+            "can_adjust_basket_weaving_hours": basket_can_adjust,
         }
     )
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -1704,6 +1845,36 @@ def systems_investigation_dispatch_status():
     resp = jsonify(payload)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
+
+
+@bp.route("/systems/focus-tree-status")
+def systems_focus_tree_status():
+    """JSON for Focus Tree panels: completion flags and whether each button may fire."""
+    user = _identify_player()
+    payload = focus_tree_status_payload(user.id if user else None)
+    resp = jsonify(payload)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@bp.route("/action/focus-tree-complete")
+def action_focus_tree_complete():
+    """Mark one Focus Tree node complete when prerequisites are satisfied."""
+    user = _identify_player()
+    if user is None:
+        return redirect("/new")
+
+    blocked = _reject_if_sermon_locked(user)
+    if blocked is not None:
+        return blocked
+
+    node_id = (request.args.get("node_id") or "").strip()
+    now = datetime.now(timezone.utc)
+    if try_complete_focus(user.id, node_id, now):
+        db.session.commit()
+        log.info("focus-tree-complete: user=%s node=%s", user.id, node_id)
+
+    return _action_response(user.id)
 
 
 @bp.route("/action/dispatch-investigation")

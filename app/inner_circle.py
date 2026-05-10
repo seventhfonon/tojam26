@@ -12,7 +12,6 @@ from .extensions import db
 from . import constants
 from .models import (
     BunkerDoubt,
-    BunkerLoyalty,
     BunkerSocialState,
     EnergyReserve,
     FoodReserve,
@@ -27,6 +26,8 @@ def seed_members_for_user_if_needed(user_id: str) -> None:
     names = constants.INNER_CIRCLE_MEMBER_NAMES
     loys = constants.INNER_CIRCLE_INITIAL_MEMBER_LOYALTIES
     pops = constants.INNER_CIRCLE_INITIAL_MEMBER_POPULARITIES
+    frus = constants.INNER_CIRCLE_INITIAL_MEMBER_FRUSTRATIONS
+    diss = constants.INNER_CIRCLE_INITIAL_MEMBER_DISPOSITIONS
     for i, name in enumerate(names):
         row = db.session.get(InnerCircleMember, (user_id, i))
         if row is None:
@@ -36,6 +37,8 @@ def seed_members_for_user_if_needed(user_id: str) -> None:
                     slot_index=i,
                     display_name=name,
                     loyalty=float(loys[i]),
+                    frustration=float(frus[i]),
+                    disposition=float(diss[i]),
                     popularity=float(pops[i]),
                 )
             )
@@ -47,43 +50,49 @@ def member_is_busy(m: InnerCircleMember, now: datetime) -> bool:
     return now < m.task_ends_at
 
 
-def popularity_loyalty_penalty(user_id: str) -> float:
-    members = db.session.scalars(
-        select(InnerCircleMember).where(InnerCircleMember.user_id == user_id)
-    ).all()
-    total = 0.0
-    rate = float(constants.INNER_CIRCLE_UNPOPULAR_LOYALTY_PENALTY_PER_POINT)
-    for m in members:
-        p = float(m.popularity)
-        if p < 50.0:
-            total += (50.0 - p) * rate
-    return total
-
-
-def drift_member_loyalties(
+def tick_member_psyche(
     user_id: str,
-    bunker_loyalty_anchor: float,
+    bunker_loyalty: float,
+    bunker_doubt: float,
     elapsed_seconds: float,
     tick_time: datetime,
 ) -> None:
+    """Frustration tracks bunker-wide anxiety; loyalty eases toward ``100 - frustration``.
+
+    Disposition (static agreeableness) scales how quickly loyalty follows frustration.
+    Low popularity adds personal frustration pressure for that member.
+    """
     if elapsed_seconds <= 0:
         return
-    anchor = max(
-        0.0,
-        min(
-            100.0,
-            bunker_loyalty_anchor + float(constants.INNER_CIRCLE_LOYALTY_BIAS),
-        ),
-    )
-    k = float(constants.INNER_CIRCLE_LOYALTY_DRIFT_PER_SECOND)
+    loyalty_in = max(0.0, min(100.0, float(bunker_loyalty)))
+    doubt_in = max(0.0, min(100.0, float(bunker_doubt)))
+    w_loy = float(constants.INNER_CIRCLE_PRESSURE_LOYALTY_WEIGHT)
+    w_do = float(constants.INNER_CIRCLE_PRESSURE_DOUBT_WEIGHT)
+    pressure = w_loy * (100.0 - loyalty_in) + w_do * doubt_in
+    pressure = max(0.0, min(100.0, pressure))
+    k_fr = float(constants.INNER_CIRCLE_FRUSTRATION_DRIFT_PER_SECOND)
+    rate_unpop = float(constants.INNER_CIRCLE_UNPOPULAR_FRUSTRATION_PER_POINT_PER_SECOND)
+    k_loy_base = float(constants.INNER_CIRCLE_LOYALTY_DRIFT_PER_SECOND)
+    slow_min = float(constants.INNER_CIRCLE_DISPOSITION_LOYALTY_SLOW_MIN)
+
     members = db.session.scalars(
         select(InnerCircleMember).where(InnerCircleMember.user_id == user_id)
     ).all()
     for m in members:
+        fr = float(m.frustration)
+        fr += k_fr * (pressure - fr) * elapsed_seconds
+        pop = float(m.popularity)
+        if pop < 50.0:
+            fr += (50.0 - pop) * rate_unpop * elapsed_seconds
+        m.frustration = max(0.0, min(100.0, fr))
+
         if member_is_busy(m, tick_time):
             continue
+        eq_loy = max(0.0, min(100.0, 100.0 - float(m.frustration)))
+        disp = max(0.0, min(100.0, float(m.disposition))) / 100.0
+        k_loy = k_loy_base * (slow_min + (1.0 - slow_min) * (1.0 - disp))
         lv = float(m.loyalty)
-        lv += k * (anchor - lv) * elapsed_seconds
+        lv += k_loy * (eq_loy - lv) * elapsed_seconds
         m.loyalty = max(0.0, min(100.0, lv))
 
 
@@ -226,10 +235,10 @@ def complete_due_tasks(
                 social.inner_circle_cash = float(social.inner_circle_cash) + float(
                     constants.INNER_CIRCLE_TEMP_JOB_CASH_GAIN
                 )
-            m.loyalty = max(
-                0.0,
-                float(m.loyalty)
-                - float(constants.INNER_CIRCLE_TEMP_JOB_MEMBER_LOYALTY_DROP),
+            m.frustration = min(
+                100.0,
+                float(m.frustration)
+                + float(constants.INNER_CIRCLE_TEMP_JOB_MEMBER_FRUSTRATION_BUMP),
             )
             if random.random() < float(constants.INNER_CIRCLE_TEMP_JOB_DOUBT_BAD_CHANCE):
                 d = min(
@@ -239,6 +248,14 @@ def complete_due_tasks(
                 db.session.add(
                     BunkerDoubt(user_id=user_id, doubt=d, timestamp=tick_time)
                 )
+
+        elif kind == constants.INNER_CIRCLE_TASK_GRANT_LUXURIES:
+            m.frustration = max(
+                0.0,
+                float(m.frustration)
+                - float(constants.INNER_CIRCLE_GRANT_LUXURIES_FRUSTRATION_DELTA),
+            )
+            sync_aggregate_inner_circle_loyalty(user_id)
 
     return (d, bunker_loyalty_bonus)
 
@@ -292,25 +309,12 @@ def try_grant_luxuries(user_id: str, slot: int, now: datetime) -> str | None:
     ne = float(latest_en.level) - energy_need
     db.session.add(EnergyReserve(user_id=user_id, level=max(0.0, ne), timestamp=now))
 
-    m.loyalty = min(
-        100.0,
-        float(m.loyalty)
-        + float(constants.INNER_CIRCLE_GRANT_LUXURIES_MEMBER_LOYALTY_DELTA),
+    _start_task(
+        m,
+        constants.INNER_CIRCLE_TASK_GRANT_LUXURIES,
+        int(constants.INNER_CIRCLE_GRANT_LUXURIES_DURATION_SECONDS),
+        now,
     )
-    latest_loy = db.session.scalars(
-        select(BunkerLoyalty)
-        .where(BunkerLoyalty.user_id == user_id)
-        .order_by(BunkerLoyalty.timestamp.desc())
-        .limit(1)
-    ).first()
-    if latest_loy is not None:
-        nl = min(
-            100.0,
-            float(latest_loy.loyalty)
-            + float(constants.INNER_CIRCLE_GRANT_LUXURIES_BUNKER_LOYALTY_DELTA),
-        )
-        db.session.add(BunkerLoyalty(user_id=user_id, loyalty=nl, timestamp=now))
-    sync_aggregate_inner_circle_loyalty(user_id)
     return None
 
 
@@ -323,8 +327,6 @@ def try_start_stage_incident(user_id: str, slot: int, now: datetime) -> str | No
         return "no_member"
     if member_is_busy(m, now):
         return "busy"
-    if float(m.popularity) + 1e-9 < float(constants.INNER_CIRCLE_POPULARITY_MIN_STAGE_INCIDENT):
-        return "low_popularity"
     _start_task(
         m,
         constants.INNER_CIRCLE_TASK_STAGE_INCIDENT,
@@ -343,6 +345,11 @@ def try_start_buy_groceries(user_id: str, slot: int, now: datetime) -> str | Non
         return "no_member"
     if member_is_busy(m, now):
         return "busy"
+    social = db.session.get(BunkerSocialState, user_id)
+    cost = float(constants.INNER_CIRCLE_BUY_GROCERIES_CASH_COST)
+    if social is None or float(social.inner_circle_cash) + 1e-9 < cost:
+        return "need_cash"
+    social.inner_circle_cash = float(social.inner_circle_cash) - cost
     _start_task(
         m,
         constants.INNER_CIRCLE_TASK_BUY_GROCERIES,
@@ -380,7 +387,6 @@ def inner_circle_status_payload(user_id: str, now: datetime) -> dict[str, object
         .order_by(InnerCircleMember.slot_index)
     ).all()
     members: list[dict[str, object]] = []
-    pop_min = float(constants.INNER_CIRCLE_POPULARITY_MIN_STAGE_INCIDENT)
     for m in members_raw:
         busy = member_is_busy(m, now)
         prog = 0.0
@@ -394,15 +400,18 @@ def inner_circle_status_payload(user_id: str, now: datetime) -> dict[str, object
                 "slot": m.slot_index,
                 "name": m.display_name,
                 "loyalty": float(m.loyalty),
+                "frustration": float(m.frustration),
+                "disposition": float(m.disposition),
                 "popularity": float(m.popularity),
                 "busy": busy,
                 "task_kind": m.task_kind,
                 "task_progress_percent": prog,
-                "can_stage_incident": float(m.popularity) >= pop_min and not busy,
             }
         )
     return {
         "cash": cash,
-        "popularity_min_for_stage_incident": pop_min,
+        "buy_groceries_cash_cost": float(
+            constants.INNER_CIRCLE_BUY_GROCERIES_CASH_COST
+        ),
         "members": members,
     }

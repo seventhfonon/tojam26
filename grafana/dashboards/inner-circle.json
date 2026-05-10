@@ -6,7 +6,7 @@
     "game"
   ],
   "schemaVersion": 39,
-  "version": 3,
+  "version": 16,
   "editable": true,
   "graphTooltip": 1,
   "time": {
@@ -38,6 +38,44 @@
         "options": [],
         "hide": 2,
         "skipUrlSync": false
+      },
+      {
+        "name": "dashboard_uid",
+        "type": "constant",
+        "query": "silo-inner-circle",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "silo-inner-circle",
+          "value": "silo-inner-circle"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "silo-inner-circle",
+            "value": "silo-inner-circle"
+          }
+        ],
+        "skipUrlSync": true
+      },
+      {
+        "name": "bgm_url",
+        "type": "constant",
+        "query": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+          "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "http://localhost:5001/assets/audio/ode_to_joy.mp3",
+            "value": "http://localhost:5001/assets/audio/ode_to_joy.mp3"
+          }
+        ],
+        "skipUrlSync": true
       }
     ]
   },
@@ -55,18 +93,18 @@
       },
       "options": {
         "mode": "html",
-        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u2622&nbsp; Environment&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\u26a1&nbsp; Power Systems&nbsp;\u2197</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83c\udf3e&nbsp; Farming&nbsp;\u2197</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(191,75,138,0.15);border:1px solid #bf4b8a;color:#ff7b72;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">\ud83d\udc51&nbsp; Inner Circle</span><a href=\"http://localhost:3000/d/silo-community?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">\ud83d\udc65&nbsp; Community&nbsp;\u2197</a></div>"
+        "content": "<script>\n(function() {\n  var uid = '${user_id}';\n  if (uid) {\n    try { localStorage.setItem('silo_user_id', uid); } catch(e) {}\n  } else {\n    var saved;\n    try { saved = localStorage.getItem('silo_user_id'); } catch(e) {}\n    if (saved) {\n      var url = new URL(window.location.href);\n      url.searchParams.set('var-user_id', saved);\n      url.searchParams.set('kiosk', 'tv');\n      window.location.replace(url.toString());\n    } else {\n      window.location.replace('http://localhost:5001');\n    }\n  }\n})();\n</script>\n<div style=\"display:flex;align-items:center;gap:10px;padding:8px 16px;height:100%;box-sizing:border-box;font-family:Inter,sans-serif;\"><span style=\"color:#555;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;flex-shrink:0;\">Silo Command</span><div style=\"width:1px;height:20px;background:#333;margin:0 4px;flex-shrink:0;\"></div><a href=\"http://localhost:3000/d/silo-environment?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">☢&nbsp; Environment&nbsp;↗</a><a href=\"http://localhost:3000/d/silo-power?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">⚡&nbsp; Power Systems&nbsp;↗</a><a href=\"http://localhost:3000/d/silo-farming?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">🌾&nbsp; Farming&nbsp;↗</a><span style=\"display:inline-flex;align-items:center;padding:5px 14px;background:rgba(191,75,138,0.15);border:1px solid #bf4b8a;color:#ff7b72;border-radius:4px;font-weight:700;font-size:13px;flex-shrink:0;\">👑&nbsp; Inner Circle</span><a href=\"http://localhost:3000/d/silo-focus-tree?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">🌳&nbsp; Focus Tree&nbsp;↗</a><a href=\"http://localhost:3000/d/silo-community?var-user_id=${user_id}&kiosk=tv\" style=\"display:inline-flex;align-items:center;padding:5px 14px;color:#888;border-radius:4px;text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;flex-shrink:0;\">👥&nbsp; Community&nbsp;↗</a></div>"
       }
     },
     {
       "id": 8,
       "type": "text",
-      "title": "\ud83d\udce1 Silo Bulletin",
+      "title": "📡 Silo Bulletin",
       "datasource": null,
       "gridPos": {
         "x": 0,
         "y": 3,
-        "w": 12,
+        "w": 24,
         "h": 5
       },
       "options": {
@@ -77,12 +115,12 @@
     {
       "id": 81,
       "type": "text",
-      "title": "\ud83d\udcac Group Chat",
+      "title": "💬 Group Chat",
       "datasource": null,
       "gridPos": {
-        "x": 12,
-        "y": 3,
-        "w": 12,
+        "x": 0,
+        "y": 8,
+        "w": 24,
         "h": 5
       },
       "options": {
@@ -97,7 +135,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 13,
         "w": 24,
         "h": 1
       },
@@ -151,7 +189,7 @@
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 14,
         "w": 5,
         "h": 5
       },
@@ -178,7 +216,7 @@
       },
       "gridPos": {
         "x": 5,
-        "y": 9,
+        "y": 14,
         "w": 19,
         "h": 8
       },
@@ -232,13 +270,13 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 17,
+        "y": 22,
         "w": 24,
-        "h": 1
+        "h": 2
       },
       "options": {
         "mode": "html",
-        "content": "<div style=\"font-family:Inter,sans-serif;padding:4px 10px;color:#c9d1d9;font-weight:700;font-size:13px;border-bottom:1px solid #21262d;\">Marnie Coldwell</div>"
+        "content": "<style>\n.ic-marquee-wrap{padding:8px 12px;height:100%;box-sizing:border-box;display:flex;align-items:center;}\n.ic-marquee{font-family:Inter,sans-serif;font-size:17px;line-height:1.35;color:#e6edf3;font-weight:700;border:1px solid #30363d;border-radius:6px;background:#0d1117;padding:12px 18px;width:100%;box-sizing:border-box;}\n</style>\n<div class=\"ic-marquee-wrap\"><div class=\"ic-marquee\">Marnie Coldwell</div></div>"
       }
     },
     {
@@ -248,84 +286,31 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 24,
         "w": 12,
-        "h": 7
+        "h": 6
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:10px 12px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;font-family:Inter,sans-serif;}\n.ic-head{width:100%;font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.4px;margin-bottom:4px}\n.ic-btn{flex:1 1 44%;padding:9px 10px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><div class=\"ic-head\">Marnie Coldwell</div><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_0\" disabled>Grant luxuries</button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_0\" disabled>Stage incident</button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_0\" disabled>Buy groceries</button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_0\" disabled>Temp job</button></div>\n<script>\n(function(){\nvar SLOT=0;\nfunction uid(){var t=(('${user_id}').replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var canSi=mem&&mem.can_stage_incident;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy||!canSi;\n bBg.disabled=locked||busy;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
+        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:8px 10px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:5px;font-family:Inter,sans-serif;}\n.ic-btn{flex:0 0 auto;display:flex;width:100%;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 8px;border:none;border-radius:6px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center;line-height:1.2}\n.ic-btn-title{font-weight:700;font-size:11px}\n.ic-btn-meta{font-weight:600;font-size:9px;opacity:0.9;line-height:1.25}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-gold .ic-btn-meta{color:#3d2b06;opacity:0.95}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_0\" disabled><span class=\"ic-btn-title\">Grant luxuries (10s)</span><span class=\"ic-btn-meta\">-28 🌾, -10 ⚡ ➔ Improve Psyche</span></button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_0\" disabled><span class=\"ic-btn-title\">Stage incident (48s)</span><span class=\"ic-btn-meta\">No cost ➔ Increase bunker loyalty &amp; decrease doubt, chance to backfire</span></button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_0\" disabled><span class=\"ic-btn-title\">Buy groceries (72s)</span><span class=\"ic-btn-meta\">$10 ➔ +42 🌾, +14 ⚡, chance to be discovered</span></button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_0\" disabled><span class=\"ic-btn-title\">Temp job (96s)</span><span class=\"ic-btn-meta\">Worsen Psyche ➔ +$38, chance to be discovered</span></button></div>\n<script>\n(function(){\nvar SLOT=0;\nfunction uid(){var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var cashNum=Number(ic.cash);\n var bgCost=Number(ic.buy_groceries_cash_cost);\n if(isNaN(cashNum))cashNum=0;\n if(isNaN(bgCost))bgCost=10;\n var canAffordGroceries=cashNum+1e-9>=bgCost;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy;\n bBg.disabled=locked||busy||!canAffordGroceries;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
       }
     },
     {
-      "type": "stat",
       "id": 102,
-      "title": "Member loyalty",
-      "datasource": {
-        "type": "postgres",
-        "uid": "silo-postgres"
-      },
-      "transparent": false,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 35
-              },
-              {
-                "color": "green",
-                "value": 55
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
-      "pluginVersion": "11.2.0",
+      "type": "text",
+      "title": "Psyche",
+      "description": "RGB swatch from /inner-circle/psyche-swatch (R=frustration, G=loyalty, B=disposition).",
+      "datasource": null,
       "gridPos": {
         "x": 12,
-        "y": 18,
+        "y": 24,
         "w": 4,
         "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "postgres",
-            "uid": "silo-postgres"
-          },
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, GREATEST(0::double precision,\n    COALESCE((SELECT loyalty FROM inner_circle_members WHERE user_id = '$user_id'::uuid AND slot_index = 0), 0::double precision)\n  )) AS v\nWHERE '$user_id' <> ''"
-        }
-      ]
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.ic-psy-wrap{height:100%;box-sizing:border-box;padding:6px;font-family:Inter,sans-serif;display:flex;flex-direction:column;border-radius:6px;border:1px solid #30363d;background:#161b22;}\n.ic-psy-img{flex:1;min-height:44px;border-radius:4px;width:100%;object-fit:cover;background:#30363d;display:block}\n.ic-psy-leg{font-size:9px;color:#8b949e;margin-top:5px;line-height:1.25;text-align:center}\n</style>\n<div class=\"ic-psy-wrap\">\n<img class=\"ic-psy-img\" id=\"_ic_psy_img_0\" alt=\"\" src=\"http://localhost:5001/inner-circle/psyche-swatch?user_id=${user_id}&slot=0\" />\n<div class=\"ic-psy-leg\">R frustration · G loyalty · B disposition</div>\n<script>\n(function(){\nvar SLOT=0;\nfunction uid(){\n var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));\n if(t)return t;\n try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}\n}\nfunction tick(){\n var img=document.getElementById('_ic_psy_img_0');\n var u=uid();\n if(!img)return;\n if(!u)return;\n img.src='http://localhost:5001/inner-circle/psyche-swatch?user_id='+encodeURIComponent(u)+'&slot=0&t='+Date.now();\n}\ntick();\nsetInterval(tick,1200);\n})();\n</script>\n</div>"
+      }
     },
     {
       "type": "stat",
@@ -380,7 +365,7 @@
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 16,
-        "y": 18,
+        "y": 24,
         "w": 4,
         "h": 3
       },
@@ -450,14 +435,16 @@
         },
         "showUnfilled": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
       },
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 12,
-        "y": 21,
+        "y": 27,
         "w": 12,
-        "h": 4
+        "h": 3
       },
       "targets": [
         {
@@ -479,13 +466,13 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 25,
+        "y": 30,
         "w": 24,
-        "h": 1
+        "h": 2
       },
       "options": {
         "mode": "html",
-        "content": "<div style=\"font-family:Inter,sans-serif;padding:4px 10px;color:#c9d1d9;font-weight:700;font-size:13px;border-bottom:1px solid #21262d;\">Jace Orbin</div>"
+        "content": "<style>\n.ic-marquee-wrap{padding:8px 12px;height:100%;box-sizing:border-box;display:flex;align-items:center;}\n.ic-marquee{font-family:Inter,sans-serif;font-size:17px;line-height:1.35;color:#e6edf3;font-weight:700;border:1px solid #30363d;border-radius:6px;background:#0d1117;padding:12px 18px;width:100%;box-sizing:border-box;}\n</style>\n<div class=\"ic-marquee-wrap\"><div class=\"ic-marquee\">Jace Orbin</div></div>"
       }
     },
     {
@@ -495,84 +482,31 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 26,
+        "y": 32,
         "w": 12,
-        "h": 7
+        "h": 6
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:10px 12px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;font-family:Inter,sans-serif;}\n.ic-head{width:100%;font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.4px;margin-bottom:4px}\n.ic-btn{flex:1 1 44%;padding:9px 10px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><div class=\"ic-head\">Jace Orbin</div><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_1\" disabled>Grant luxuries</button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_1\" disabled>Stage incident</button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_1\" disabled>Buy groceries</button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_1\" disabled>Temp job</button></div>\n<script>\n(function(){\nvar SLOT=1;\nfunction uid(){var t=(('${user_id}').replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var canSi=mem&&mem.can_stage_incident;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy||!canSi;\n bBg.disabled=locked||busy;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
+        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:8px 10px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:5px;font-family:Inter,sans-serif;}\n.ic-btn{flex:0 0 auto;display:flex;width:100%;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 8px;border:none;border-radius:6px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center;line-height:1.2}\n.ic-btn-title{font-weight:700;font-size:11px}\n.ic-btn-meta{font-weight:600;font-size:9px;opacity:0.9;line-height:1.25}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-gold .ic-btn-meta{color:#3d2b06;opacity:0.95}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_1\" disabled><span class=\"ic-btn-title\">Grant luxuries (10s)</span><span class=\"ic-btn-meta\">-28 🌾, -10 ⚡ ➔ Improve Psyche</span></button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_1\" disabled><span class=\"ic-btn-title\">Stage incident (48s)</span><span class=\"ic-btn-meta\">No cost ➔ Increase bunker loyalty &amp; decrease doubt, chance to backfire</span></button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_1\" disabled><span class=\"ic-btn-title\">Buy groceries (72s)</span><span class=\"ic-btn-meta\">$10 ➔ +42 🌾, +14 ⚡, chance to be discovered</span></button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_1\" disabled><span class=\"ic-btn-title\">Temp job (96s)</span><span class=\"ic-btn-meta\">Worsen Psyche ➔ +$38, chance to be discovered</span></button></div>\n<script>\n(function(){\nvar SLOT=1;\nfunction uid(){var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var cashNum=Number(ic.cash);\n var bgCost=Number(ic.buy_groceries_cash_cost);\n if(isNaN(cashNum))cashNum=0;\n if(isNaN(bgCost))bgCost=10;\n var canAffordGroceries=cashNum+1e-9>=bgCost;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy;\n bBg.disabled=locked||busy||!canAffordGroceries;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
       }
     },
     {
-      "type": "stat",
       "id": 107,
-      "title": "Member loyalty",
-      "datasource": {
-        "type": "postgres",
-        "uid": "silo-postgres"
-      },
-      "transparent": false,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 35
-              },
-              {
-                "color": "green",
-                "value": 55
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
-      "pluginVersion": "11.2.0",
+      "type": "text",
+      "title": "Psyche",
+      "description": "RGB swatch from /inner-circle/psyche-swatch (R=frustration, G=loyalty, B=disposition).",
+      "datasource": null,
       "gridPos": {
         "x": 12,
-        "y": 26,
+        "y": 32,
         "w": 4,
         "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "postgres",
-            "uid": "silo-postgres"
-          },
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, GREATEST(0::double precision,\n    COALESCE((SELECT loyalty FROM inner_circle_members WHERE user_id = '$user_id'::uuid AND slot_index = 1), 0::double precision)\n  )) AS v\nWHERE '$user_id' <> ''"
-        }
-      ]
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.ic-psy-wrap{height:100%;box-sizing:border-box;padding:6px;font-family:Inter,sans-serif;display:flex;flex-direction:column;border-radius:6px;border:1px solid #30363d;background:#161b22;}\n.ic-psy-img{flex:1;min-height:44px;border-radius:4px;width:100%;object-fit:cover;background:#30363d;display:block}\n.ic-psy-leg{font-size:9px;color:#8b949e;margin-top:5px;line-height:1.25;text-align:center}\n</style>\n<div class=\"ic-psy-wrap\">\n<img class=\"ic-psy-img\" id=\"_ic_psy_img_1\" alt=\"\" src=\"http://localhost:5001/inner-circle/psyche-swatch?user_id=${user_id}&slot=1\" />\n<div class=\"ic-psy-leg\">R frustration · G loyalty · B disposition</div>\n<script>\n(function(){\nvar SLOT=1;\nfunction uid(){\n var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));\n if(t)return t;\n try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}\n}\nfunction tick(){\n var img=document.getElementById('_ic_psy_img_1');\n var u=uid();\n if(!img)return;\n if(!u)return;\n img.src='http://localhost:5001/inner-circle/psyche-swatch?user_id='+encodeURIComponent(u)+'&slot=1&t='+Date.now();\n}\ntick();\nsetInterval(tick,1200);\n})();\n</script>\n</div>"
+      }
     },
     {
       "type": "stat",
@@ -627,7 +561,7 @@
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 16,
-        "y": 26,
+        "y": 32,
         "w": 4,
         "h": 3
       },
@@ -697,14 +631,16 @@
         },
         "showUnfilled": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
       },
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 12,
-        "y": 29,
+        "y": 35,
         "w": 12,
-        "h": 4
+        "h": 3
       },
       "targets": [
         {
@@ -726,13 +662,13 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 33,
+        "y": 38,
         "w": 24,
-        "h": 1
+        "h": 2
       },
       "options": {
         "mode": "html",
-        "content": "<div style=\"font-family:Inter,sans-serif;padding:4px 10px;color:#c9d1d9;font-weight:700;font-size:13px;border-bottom:1px solid #21262d;\">Vesper Kline</div>"
+        "content": "<style>\n.ic-marquee-wrap{padding:8px 12px;height:100%;box-sizing:border-box;display:flex;align-items:center;}\n.ic-marquee{font-family:Inter,sans-serif;font-size:17px;line-height:1.35;color:#e6edf3;font-weight:700;border:1px solid #30363d;border-radius:6px;background:#0d1117;padding:12px 18px;width:100%;box-sizing:border-box;}\n</style>\n<div class=\"ic-marquee-wrap\"><div class=\"ic-marquee\">Vesper Kline</div></div>"
       }
     },
     {
@@ -742,84 +678,31 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 40,
         "w": 12,
-        "h": 7
+        "h": 6
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:10px 12px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;font-family:Inter,sans-serif;}\n.ic-head{width:100%;font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.4px;margin-bottom:4px}\n.ic-btn{flex:1 1 44%;padding:9px 10px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><div class=\"ic-head\">Vesper Kline</div><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_2\" disabled>Grant luxuries</button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_2\" disabled>Stage incident</button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_2\" disabled>Buy groceries</button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_2\" disabled>Temp job</button></div>\n<script>\n(function(){\nvar SLOT=2;\nfunction uid(){var t=(('${user_id}').replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var canSi=mem&&mem.can_stage_incident;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy||!canSi;\n bBg.disabled=locked||busy;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
+        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:8px 10px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:5px;font-family:Inter,sans-serif;}\n.ic-btn{flex:0 0 auto;display:flex;width:100%;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 8px;border:none;border-radius:6px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center;line-height:1.2}\n.ic-btn-title{font-weight:700;font-size:11px}\n.ic-btn-meta{font-weight:600;font-size:9px;opacity:0.9;line-height:1.25}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-gold .ic-btn-meta{color:#3d2b06;opacity:0.95}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_2\" disabled><span class=\"ic-btn-title\">Grant luxuries (10s)</span><span class=\"ic-btn-meta\">-28 🌾, -10 ⚡ ➔ Improve Psyche</span></button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_2\" disabled><span class=\"ic-btn-title\">Stage incident (48s)</span><span class=\"ic-btn-meta\">No cost ➔ Increase bunker loyalty &amp; decrease doubt, chance to backfire</span></button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_2\" disabled><span class=\"ic-btn-title\">Buy groceries (72s)</span><span class=\"ic-btn-meta\">$10 ➔ +42 🌾, +14 ⚡, chance to be discovered</span></button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_2\" disabled><span class=\"ic-btn-title\">Temp job (96s)</span><span class=\"ic-btn-meta\">Worsen Psyche ➔ +$38, chance to be discovered</span></button></div>\n<script>\n(function(){\nvar SLOT=2;\nfunction uid(){var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var cashNum=Number(ic.cash);\n var bgCost=Number(ic.buy_groceries_cash_cost);\n if(isNaN(cashNum))cashNum=0;\n if(isNaN(bgCost))bgCost=10;\n var canAffordGroceries=cashNum+1e-9>=bgCost;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy;\n bBg.disabled=locked||busy||!canAffordGroceries;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
       }
     },
     {
-      "type": "stat",
       "id": 112,
-      "title": "Member loyalty",
-      "datasource": {
-        "type": "postgres",
-        "uid": "silo-postgres"
-      },
-      "transparent": false,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 35
-              },
-              {
-                "color": "green",
-                "value": 55
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
-      "pluginVersion": "11.2.0",
+      "type": "text",
+      "title": "Psyche",
+      "description": "RGB swatch from /inner-circle/psyche-swatch (R=frustration, G=loyalty, B=disposition).",
+      "datasource": null,
       "gridPos": {
         "x": 12,
-        "y": 34,
+        "y": 40,
         "w": 4,
         "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "postgres",
-            "uid": "silo-postgres"
-          },
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, GREATEST(0::double precision,\n    COALESCE((SELECT loyalty FROM inner_circle_members WHERE user_id = '$user_id'::uuid AND slot_index = 2), 0::double precision)\n  )) AS v\nWHERE '$user_id' <> ''"
-        }
-      ]
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.ic-psy-wrap{height:100%;box-sizing:border-box;padding:6px;font-family:Inter,sans-serif;display:flex;flex-direction:column;border-radius:6px;border:1px solid #30363d;background:#161b22;}\n.ic-psy-img{flex:1;min-height:44px;border-radius:4px;width:100%;object-fit:cover;background:#30363d;display:block}\n.ic-psy-leg{font-size:9px;color:#8b949e;margin-top:5px;line-height:1.25;text-align:center}\n</style>\n<div class=\"ic-psy-wrap\">\n<img class=\"ic-psy-img\" id=\"_ic_psy_img_2\" alt=\"\" src=\"http://localhost:5001/inner-circle/psyche-swatch?user_id=${user_id}&slot=2\" />\n<div class=\"ic-psy-leg\">R frustration · G loyalty · B disposition</div>\n<script>\n(function(){\nvar SLOT=2;\nfunction uid(){\n var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));\n if(t)return t;\n try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}\n}\nfunction tick(){\n var img=document.getElementById('_ic_psy_img_2');\n var u=uid();\n if(!img)return;\n if(!u)return;\n img.src='http://localhost:5001/inner-circle/psyche-swatch?user_id='+encodeURIComponent(u)+'&slot=2&t='+Date.now();\n}\ntick();\nsetInterval(tick,1200);\n})();\n</script>\n</div>"
+      }
     },
     {
       "type": "stat",
@@ -874,7 +757,7 @@
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 16,
-        "y": 34,
+        "y": 40,
         "w": 4,
         "h": 3
       },
@@ -944,14 +827,16 @@
         },
         "showUnfilled": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
       },
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 12,
-        "y": 37,
+        "y": 43,
         "w": 12,
-        "h": 4
+        "h": 3
       },
       "targets": [
         {
@@ -973,13 +858,13 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 41,
+        "y": 46,
         "w": 24,
-        "h": 1
+        "h": 2
       },
       "options": {
         "mode": "html",
-        "content": "<div style=\"font-family:Inter,sans-serif;padding:4px 10px;color:#c9d1d9;font-weight:700;font-size:13px;border-bottom:1px solid #21262d;\">Tamsin Greer</div>"
+        "content": "<style>\n.ic-marquee-wrap{padding:8px 12px;height:100%;box-sizing:border-box;display:flex;align-items:center;}\n.ic-marquee{font-family:Inter,sans-serif;font-size:17px;line-height:1.35;color:#e6edf3;font-weight:700;border:1px solid #30363d;border-radius:6px;background:#0d1117;padding:12px 18px;width:100%;box-sizing:border-box;}\n</style>\n<div class=\"ic-marquee-wrap\"><div class=\"ic-marquee\">Tamsin Greer</div></div>"
       }
     },
     {
@@ -989,84 +874,31 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 42,
+        "y": 48,
         "w": 12,
-        "h": 7
+        "h": 6
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:10px 12px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;font-family:Inter,sans-serif;}\n.ic-head{width:100%;font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.4px;margin-bottom:4px}\n.ic-btn{flex:1 1 44%;padding:9px 10px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><div class=\"ic-head\">Tamsin Greer</div><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_3\" disabled>Grant luxuries</button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_3\" disabled>Stage incident</button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_3\" disabled>Buy groceries</button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_3\" disabled>Temp job</button></div>\n<script>\n(function(){\nvar SLOT=3;\nfunction uid(){var t=(('${user_id}').replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var canSi=mem&&mem.can_stage_incident;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy||!canSi;\n bBg.disabled=locked||busy;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
+        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:8px 10px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:5px;font-family:Inter,sans-serif;}\n.ic-btn{flex:0 0 auto;display:flex;width:100%;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 8px;border:none;border-radius:6px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center;line-height:1.2}\n.ic-btn-title{font-weight:700;font-size:11px}\n.ic-btn-meta{font-weight:600;font-size:9px;opacity:0.9;line-height:1.25}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-gold .ic-btn-meta{color:#3d2b06;opacity:0.95}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_3\" disabled><span class=\"ic-btn-title\">Grant luxuries (10s)</span><span class=\"ic-btn-meta\">-28 🌾, -10 ⚡ ➔ Improve Psyche</span></button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_3\" disabled><span class=\"ic-btn-title\">Stage incident (48s)</span><span class=\"ic-btn-meta\">No cost ➔ Increase bunker loyalty &amp; decrease doubt, chance to backfire</span></button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_3\" disabled><span class=\"ic-btn-title\">Buy groceries (72s)</span><span class=\"ic-btn-meta\">$10 ➔ +42 🌾, +14 ⚡, chance to be discovered</span></button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_3\" disabled><span class=\"ic-btn-title\">Temp job (96s)</span><span class=\"ic-btn-meta\">Worsen Psyche ➔ +$38, chance to be discovered</span></button></div>\n<script>\n(function(){\nvar SLOT=3;\nfunction uid(){var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var cashNum=Number(ic.cash);\n var bgCost=Number(ic.buy_groceries_cash_cost);\n if(isNaN(cashNum))cashNum=0;\n if(isNaN(bgCost))bgCost=10;\n var canAffordGroceries=cashNum+1e-9>=bgCost;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy;\n bBg.disabled=locked||busy||!canAffordGroceries;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
       }
     },
     {
-      "type": "stat",
       "id": 117,
-      "title": "Member loyalty",
-      "datasource": {
-        "type": "postgres",
-        "uid": "silo-postgres"
-      },
-      "transparent": false,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 35
-              },
-              {
-                "color": "green",
-                "value": 55
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
-      "pluginVersion": "11.2.0",
+      "type": "text",
+      "title": "Psyche",
+      "description": "RGB swatch from /inner-circle/psyche-swatch (R=frustration, G=loyalty, B=disposition).",
+      "datasource": null,
       "gridPos": {
         "x": 12,
-        "y": 42,
+        "y": 48,
         "w": 4,
         "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "postgres",
-            "uid": "silo-postgres"
-          },
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, GREATEST(0::double precision,\n    COALESCE((SELECT loyalty FROM inner_circle_members WHERE user_id = '$user_id'::uuid AND slot_index = 3), 0::double precision)\n  )) AS v\nWHERE '$user_id' <> ''"
-        }
-      ]
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.ic-psy-wrap{height:100%;box-sizing:border-box;padding:6px;font-family:Inter,sans-serif;display:flex;flex-direction:column;border-radius:6px;border:1px solid #30363d;background:#161b22;}\n.ic-psy-img{flex:1;min-height:44px;border-radius:4px;width:100%;object-fit:cover;background:#30363d;display:block}\n.ic-psy-leg{font-size:9px;color:#8b949e;margin-top:5px;line-height:1.25;text-align:center}\n</style>\n<div class=\"ic-psy-wrap\">\n<img class=\"ic-psy-img\" id=\"_ic_psy_img_3\" alt=\"\" src=\"http://localhost:5001/inner-circle/psyche-swatch?user_id=${user_id}&slot=3\" />\n<div class=\"ic-psy-leg\">R frustration · G loyalty · B disposition</div>\n<script>\n(function(){\nvar SLOT=3;\nfunction uid(){\n var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));\n if(t)return t;\n try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}\n}\nfunction tick(){\n var img=document.getElementById('_ic_psy_img_3');\n var u=uid();\n if(!img)return;\n if(!u)return;\n img.src='http://localhost:5001/inner-circle/psyche-swatch?user_id='+encodeURIComponent(u)+'&slot=3&t='+Date.now();\n}\ntick();\nsetInterval(tick,1200);\n})();\n</script>\n</div>"
+      }
     },
     {
       "type": "stat",
@@ -1121,7 +953,7 @@
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 16,
-        "y": 42,
+        "y": 48,
         "w": 4,
         "h": 3
       },
@@ -1191,14 +1023,16 @@
         },
         "showUnfilled": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
       },
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 12,
-        "y": 45,
+        "y": 51,
         "w": 12,
-        "h": 4
+        "h": 3
       },
       "targets": [
         {
@@ -1220,13 +1054,13 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 49,
+        "y": 54,
         "w": 24,
-        "h": 1
+        "h": 2
       },
       "options": {
         "mode": "html",
-        "content": "<div style=\"font-family:Inter,sans-serif;padding:4px 10px;color:#c9d1d9;font-weight:700;font-size:13px;border-bottom:1px solid #21262d;\">Nadia Firth</div>"
+        "content": "<style>\n.ic-marquee-wrap{padding:8px 12px;height:100%;box-sizing:border-box;display:flex;align-items:center;}\n.ic-marquee{font-family:Inter,sans-serif;font-size:17px;line-height:1.35;color:#e6edf3;font-weight:700;border:1px solid #30363d;border-radius:6px;background:#0d1117;padding:12px 18px;width:100%;box-sizing:border-box;}\n</style>\n<div class=\"ic-marquee-wrap\"><div class=\"ic-marquee\">Nadia Firth</div></div>"
       }
     },
     {
@@ -1236,84 +1070,31 @@
       "datasource": null,
       "gridPos": {
         "x": 0,
-        "y": 50,
+        "y": 56,
         "w": 12,
-        "h": 7
+        "h": 6
       },
       "options": {
         "mode": "html",
-        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:10px 12px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;font-family:Inter,sans-serif;}\n.ic-head{width:100%;font-size:11px;color:#8b949e;font-weight:700;letter-spacing:.4px;margin-bottom:4px}\n.ic-btn{flex:1 1 44%;padding:9px 10px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><div class=\"ic-head\">Nadia Firth</div><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_4\" disabled>Grant luxuries</button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_4\" disabled>Stage incident</button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_4\" disabled>Buy groceries</button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_4\" disabled>Temp job</button></div>\n<script>\n(function(){\nvar SLOT=4;\nfunction uid(){var t=(('${user_id}').replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var canSi=mem&&mem.can_stage_incident;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy||!canSi;\n bBg.disabled=locked||busy;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
+        "content": "<style>\n.ic-wrap{border:1px solid #30363d;border-radius:8px;padding:8px 10px;background:#161b22;height:100%;box-sizing:border-box;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:5px;font-family:Inter,sans-serif;}\n.ic-btn{flex:0 0 auto;display:flex;width:100%;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 8px;border:none;border-radius:6px;cursor:pointer;font-family:Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.4);transition:opacity .15s;color:#fff;box-sizing:border-box;text-align:center;line-height:1.2}\n.ic-btn-title{font-weight:700;font-size:11px}\n.ic-btn-meta{font-weight:600;font-size:9px;opacity:0.9;line-height:1.25}\n.ic-btn:disabled{opacity:.45;cursor:not-allowed}\n.ic-teal{background:#238636}\n.ic-gold{background:#9e6a03;color:#0d1117}\n.ic-gold .ic-btn-meta{color:#3d2b06;opacity:0.95}\n.ic-rose{background:#a371f7}\n.ic-slate{background:#30363d}\n</style>\n<div class=\"ic-wrap\"><button type=\"button\" class=\"ic-btn ic-teal\" id=\"_ic_gl_4\" disabled><span class=\"ic-btn-title\">Grant luxuries (10s)</span><span class=\"ic-btn-meta\">-28 🌾, -10 ⚡ ➔ Improve Psyche</span></button><button type=\"button\" class=\"ic-btn ic-gold\" id=\"_ic_si_4\" disabled><span class=\"ic-btn-title\">Stage incident (48s)</span><span class=\"ic-btn-meta\">No cost ➔ Increase bunker loyalty &amp; decrease doubt, chance to backfire</span></button><button type=\"button\" class=\"ic-btn ic-rose\" id=\"_ic_bg_4\" disabled><span class=\"ic-btn-title\">Buy groceries (72s)</span><span class=\"ic-btn-meta\">$10 ➔ +42 🌾, +14 ⚡, chance to be discovered</span></button><button type=\"button\" class=\"ic-btn ic-slate\" id=\"_ic_tj_4\" disabled><span class=\"ic-btn-title\">Temp job (96s)</span><span class=\"ic-btn-meta\">Worsen Psyche ➔ +$38, chance to be discovered</span></button></div>\n<script>\n(function(){\nvar SLOT=4;\nfunction uid(){var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));if(t)return t;try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}}\nfunction hit(path){var u=uid();var f=document.getElementById('_silo_ic_iframe');if(!f){f=document.createElement('iframe');f.id='_silo_ic_iframe';f.style.cssText='position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;';document.body.appendChild(f);}f.src='http://localhost:5001'+path+'?user_id='+encodeURIComponent(u)+'&slot='+SLOT;}\nfunction sync(){\nvar u=uid();\nvar bGl=document.getElementById('_ic_gl_'+SLOT);\nvar bSi=document.getElementById('_ic_si_'+SLOT);\nvar bBg=document.getElementById('_ic_bg_'+SLOT);\nvar bTj=document.getElementById('_ic_tj_'+SLOT);\nif(!bGl||!bSi||!bBg||!bTj)return;\nif(!u){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});return;}\nPromise.all([\n fetch('http://localhost:5001/socials/action-status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();}),\n fetch('http://localhost:5001/inner-circle/status?user_id='+encodeURIComponent(u)).then(function(r){return r.json();})\n]).then(function(pair){\n var st=pair[0];\n var ic=pair[1];\n var locked=!!st.actions_locked;\n var mem=(ic.members||[]).filter(function(m){return m.slot===SLOT;})[0];\n var busy=mem&&mem.busy;\n var cashNum=Number(ic.cash);\n var bgCost=Number(ic.buy_groceries_cash_cost);\n if(isNaN(cashNum))cashNum=0;\n if(isNaN(bgCost))bgCost=10;\n var canAffordGroceries=cashNum+1e-9>=bgCost;\n bGl.disabled=locked||busy;\n bSi.disabled=locked||busy;\n bBg.disabled=locked||busy||!canAffordGroceries;\n bTj.disabled=locked||busy;\n}).catch(function(){[bGl,bSi,bBg,bTj].forEach(function(b){b.disabled=true;});});\n}\ndocument.getElementById('_ic_gl_'+SLOT).onclick=function(){hit('/action/inner-circle/grant-luxuries');setTimeout(sync,400);};\ndocument.getElementById('_ic_si_'+SLOT).onclick=function(){hit('/action/inner-circle/stage-incident');setTimeout(sync,400);};\ndocument.getElementById('_ic_bg_'+SLOT).onclick=function(){hit('/action/inner-circle/buy-groceries');setTimeout(sync,400);};\ndocument.getElementById('_ic_tj_'+SLOT).onclick=function(){hit('/action/inner-circle/temp-job');setTimeout(sync,400);};\nsync();setInterval(sync,1200);\n})();\n</script>"
       }
     },
     {
-      "type": "stat",
       "id": 122,
-      "title": "Member loyalty",
-      "datasource": {
-        "type": "postgres",
-        "uid": "silo-postgres"
-      },
-      "transparent": false,
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 35
-              },
-              {
-                "color": "green",
-                "value": 55
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
-      "pluginVersion": "11.2.0",
+      "type": "text",
+      "title": "Psyche",
+      "description": "RGB swatch from /inner-circle/psyche-swatch (R=frustration, G=loyalty, B=disposition).",
+      "datasource": null,
       "gridPos": {
         "x": 12,
-        "y": 50,
+        "y": 56,
         "w": 4,
         "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "postgres",
-            "uid": "silo-postgres"
-          },
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT NOW() AS time,\n  LEAST(100::double precision, GREATEST(0::double precision,\n    COALESCE((SELECT loyalty FROM inner_circle_members WHERE user_id = '$user_id'::uuid AND slot_index = 4), 0::double precision)\n  )) AS v\nWHERE '$user_id' <> ''"
-        }
-      ]
+      "options": {
+        "mode": "html",
+        "content": "<style>\n.ic-psy-wrap{height:100%;box-sizing:border-box;padding:6px;font-family:Inter,sans-serif;display:flex;flex-direction:column;border-radius:6px;border:1px solid #30363d;background:#161b22;}\n.ic-psy-img{flex:1;min-height:44px;border-radius:4px;width:100%;object-fit:cover;background:#30363d;display:block}\n.ic-psy-leg{font-size:9px;color:#8b949e;margin-top:5px;line-height:1.25;text-align:center}\n</style>\n<div class=\"ic-psy-wrap\">\n<img class=\"ic-psy-img\" id=\"_ic_psy_img_4\" alt=\"\" src=\"http://localhost:5001/inner-circle/psyche-swatch?user_id=${user_id}&slot=4\" />\n<div class=\"ic-psy-leg\">R frustration · G loyalty · B disposition</div>\n<script>\n(function(){\nvar SLOT=4;\nfunction uid(){\n var t=((\"${user_id}\").replace(/^\\s+|\\s+$/g,\"\"));\n if(t)return t;\n try{return localStorage.getItem(\"silo_user_id\")||\"\";}catch(e){return \"\";}\n}\nfunction tick(){\n var img=document.getElementById('_ic_psy_img_4');\n var u=uid();\n if(!img)return;\n if(!u)return;\n img.src='http://localhost:5001/inner-circle/psyche-swatch?user_id='+encodeURIComponent(u)+'&slot=4&t='+Date.now();\n}\ntick();\nsetInterval(tick,1200);\n})();\n</script>\n</div>"
+      }
     },
     {
       "type": "stat",
@@ -1368,7 +1149,7 @@
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 16,
-        "y": 50,
+        "y": 56,
         "w": 4,
         "h": 3
       },
@@ -1438,14 +1219,16 @@
         },
         "showUnfilled": true,
         "sizing": "auto",
-        "valueMode": "color"
+        "valueMode": "color",
+        "valuePlacement": "hidden",
+        "textMode": "none"
       },
       "pluginVersion": "11.2.0",
       "gridPos": {
         "x": 12,
-        "y": 53,
+        "y": 59,
         "w": 12,
-        "h": 4
+        "h": 3
       },
       "targets": [
         {
@@ -1459,6 +1242,22 @@
           "rawSql": "SELECT NOW() AS time,\n  CASE\n    WHEN task_ends_at IS NULL THEN 0::double precision\n    ELSE LEAST(100::double precision,\n      100.0 * EXTRACT(EPOCH FROM (LEAST(NOW(), task_ends_at) - task_started_at))\n      / NULLIF(EXTRACT(EPOCH FROM (task_ends_at - task_started_at)), 0))\n    END AS progress\nFROM inner_circle_members\nWHERE '$user_id' <> '' AND user_id = '$user_id'::uuid AND slot_index = 4"
         }
       ]
+    },
+    {
+      "id": 200,
+      "type": "text",
+      "title": "BGM",
+      "datasource": null,
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 2
+      },
+      "options": {
+        "mode": "html",
+        "content": "<!--\n  Paste into Grafana Text panel (HTML mode) options.content, OR run:\n    python scripts/embed_grafana_bgm.py\n  Template vars (hidden constants on each dashboard): ${bgm_url}, ${dashboard_uid}\n-->\n<style>\n.silo-bgm-bar {\n  font-family: Inter, sans-serif;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 6px 10px;\n  box-sizing: border-box;\n  border: 1px solid #30363d;\n  border-radius: 6px;\n  background: #161b22;\n  color: #8b949e;\n  font-size: 12px;\n}\n.silo-bgm-bar button {\n  padding: 6px 12px;\n  border: none;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: 700;\n  font-size: 12px;\n  font-family: Inter, sans-serif;\n  background: #8957e5;\n  color: #fff;\n  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);\n}\n.silo-bgm-bar button:disabled {\n  opacity: 0.45;\n  cursor: not-allowed;\n}\n</style>\n<div id=\"_silo_bgm_wrap\" class=\"silo-bgm-bar\">\n  <button type=\"button\" id=\"_silo_bgm_btn\">Enable bunker audio</button>\n  <span id=\"_silo_bgm_status\">Optional bunker audio</span>\n</div>\n<script>\n(function siloBgmDashAudio() {\n  var TRACK = ('${bgm_url}' || '').trim();\n  var DASH = ('${dashboard_uid}' || '').trim();\n  var wrap = document.getElementById('_silo_bgm_wrap');\n  var btn = document.getElementById('_silo_bgm_btn');\n  var statusEl = document.getElementById('_silo_bgm_status');\n\n  if (!TRACK) {\n    if (wrap) wrap.style.display = 'none';\n    return;\n  }\n\n  var LS_KEY = 'silo_bgm_enabled';\n  var audio = new Audio(TRACK);\n  audio.loop = true;\n  audio.volume = 0.35;\n\n  var io = null;\n\n  function teardown() {\n    document.removeEventListener('visibilitychange', onVis);\n    if (io && wrap) {\n      try {\n        io.unobserve(wrap);\n        io.disconnect();\n      } catch (e) {}\n      io = null;\n    }\n    try {\n      audio.pause();\n      audio.removeAttribute('src');\n      audio.load();\n    } catch (e) {}\n  }\n\n  var api = {\n    dash: DASH,\n    destroy: function () {\n      teardown();\n      if (window.__SILO_BGM__ === api) {\n        window.__SILO_BGM__ = null;\n      }\n    },\n    audio: audio,\n  };\n\n  var prev = window.__SILO_BGM__;\n  if (prev && typeof prev.destroy === 'function') {\n    prev.destroy();\n  }\n  window.__SILO_BGM__ = api;\n\n  function onVis() {\n    if (document.hidden) {\n      audio.pause();\n    } else {\n      try {\n        if (localStorage.getItem(LS_KEY) === '1') {\n          tryPlay(false);\n        }\n      } catch (e) {}\n    }\n  }\n\n  function tryPlay(fromUser) {\n    var p = audio.play();\n    if (p !== undefined && typeof p.then === 'function') {\n      p.then(function () {\n        if (btn) btn.style.display = 'none';\n        if (statusEl) statusEl.textContent = 'Playing';\n      }).catch(function () {\n        if (btn) btn.style.display = '';\n        if (statusEl && !fromUser) {\n          statusEl.textContent = 'Tap Enable to play';\n        }\n      });\n    }\n  }\n\n  document.addEventListener('visibilitychange', onVis);\n\n  if (wrap && typeof IntersectionObserver !== 'undefined') {\n    io = new IntersectionObserver(\n      function (entries) {\n        var hit = entries.some(function (en) {\n          return en.isIntersecting && en.intersectionRatio > 0;\n        });\n        if (!hit) {\n          audio.pause();\n        } else {\n          try {\n            if (\n              localStorage.getItem(LS_KEY) === '1' &&\n              !document.hidden\n            ) {\n              tryPlay(false);\n            }\n          } catch (e) {}\n        }\n      },\n      { threshold: [0, 0.01] }\n    );\n    io.observe(wrap);\n  }\n\n  if (btn) {\n    btn.addEventListener('click', function () {\n      try {\n        localStorage.setItem(LS_KEY, '1');\n      } catch (e) {}\n      tryPlay(true);\n    });\n  }\n\n  try {\n    if (localStorage.getItem(LS_KEY) === '1') {\n      tryPlay(false);\n    }\n  } catch (e) {}\n})();\n</script>\n"
+      }
     }
   ]
 }

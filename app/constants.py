@@ -233,22 +233,39 @@ INNER_CIRCLE_MEMBER_NAMES: tuple[str, ...] = (
 INNER_CIRCLE_MEMBER_COUNT = len(INNER_CIRCLE_MEMBER_NAMES)
 INNER_CIRCLE_INITIAL_MEMBER_LOYALTIES: tuple[float, ...] = (58.0, 62.0, 60.0, 59.0, 61.0)
 INNER_CIRCLE_INITIAL_MEMBER_POPULARITIES: tuple[float, ...] = (52.0, 48.0, 55.0, 50.0, 53.0)
-# Members drift toward bunker loyalty plus this bias (stay more loyal than the general population).
-INNER_CIRCLE_LOYALTY_BIAS = 9.0
+INNER_CIRCLE_INITIAL_MEMBER_FRUSTRATIONS: tuple[float, ...] = (
+    40.0,
+    34.0,
+    38.0,
+    39.0,
+    36.0,
+)
+INNER_CIRCLE_INITIAL_MEMBER_DISPOSITIONS: tuple[float, ...] = (
+    68.0,
+    52.0,
+    76.0,
+    58.0,
+    72.0,
+)
+# Loyalty eases toward ``100 - frustration``; higher disposition shrinks this speed (floor below).
 INNER_CIRCLE_LOYALTY_DRIFT_PER_SECOND = 0.04
-# Each popularity point below 50 applies this penalty to bunker loyalty (summed per member).
-INNER_CIRCLE_UNPOPULAR_LOYALTY_PENALTY_PER_POINT = 0.12
-# Minimum popularity to start "Stage incident".
-INNER_CIRCLE_POPULARITY_MIN_STAGE_INCIDENT = 28.0
-
+INNER_CIRCLE_DISPOSITION_LOYALTY_SLOW_MIN = 0.22
+# First-order pull of frustration toward bunker-wide pressure from loyalty + doubt.
+INNER_CIRCLE_FRUSTRATION_DRIFT_PER_SECOND = 0.065
+INNER_CIRCLE_PRESSURE_LOYALTY_WEIGHT = 0.55
+INNER_CIRCLE_PRESSURE_DOUBT_WEIGHT = 0.45
+# Per popularity point below 50; scaled per elapsed second (matches legacy tick sizing ~30s).
+INNER_CIRCLE_UNPOPULAR_FRUSTRATION_PER_POINT_PER_SECOND = 0.004
 INNER_CIRCLE_TASK_STAGE_INCIDENT = "stage_incident"
 INNER_CIRCLE_TASK_BUY_GROCERIES = "buy_groceries"
 INNER_CIRCLE_TASK_TEMP_JOB = "temp_job"
+INNER_CIRCLE_TASK_GRANT_LUXURIES = "grant_luxuries"
+
+INNER_CIRCLE_GRANT_LUXURIES_DURATION_SECONDS = 10
 
 INNER_CIRCLE_GRANT_LUXURIES_FOOD_COST = 28.0
 INNER_CIRCLE_GRANT_LUXURIES_ENERGY_COST = 10.0
-INNER_CIRCLE_GRANT_LUXURIES_MEMBER_LOYALTY_DELTA = 7.0
-INNER_CIRCLE_GRANT_LUXURIES_BUNKER_LOYALTY_DELTA = 3.5
+INNER_CIRCLE_GRANT_LUXURIES_FRUSTRATION_DELTA = 14.0
 
 INNER_CIRCLE_STAGE_INCIDENT_DURATION_SECONDS = 48
 INNER_CIRCLE_STAGE_INCIDENT_MEMBER_LOYALTY_DELTA = 9.0
@@ -259,6 +276,7 @@ INNER_CIRCLE_STAGE_INCIDENT_DISCOVER_POPULARITY_DROP = 22.0
 INNER_CIRCLE_STAGE_INCIDENT_DISCOVER_DOUBT_BUMP = 11.0
 
 INNER_CIRCLE_BUY_GROCERIES_DURATION_SECONDS = 72
+INNER_CIRCLE_BUY_GROCERIES_CASH_COST = 10.0
 INNER_CIRCLE_BUY_GROCERIES_FOOD_GAIN = 42.0
 INNER_CIRCLE_BUY_GROCERIES_ENERGY_GAIN = 14.0
 INNER_CIRCLE_BUY_GROCERIES_DOUBT_BAD_CHANCE = 0.52
@@ -266,7 +284,7 @@ INNER_CIRCLE_BUY_GROCERIES_DOUBT_BAD_AMOUNT = 12.0
 
 INNER_CIRCLE_TEMP_JOB_DURATION_SECONDS = 96
 INNER_CIRCLE_TEMP_JOB_CASH_GAIN = 38.0
-INNER_CIRCLE_TEMP_JOB_MEMBER_LOYALTY_DROP = 10.0
+INNER_CIRCLE_TEMP_JOB_MEMBER_FRUSTRATION_BUMP = 12.0
 INNER_CIRCLE_TEMP_JOB_DOUBT_BAD_CHANCE = 0.48
 INNER_CIRCLE_TEMP_JOB_DOUBT_BAD_AMOUNT = 15.0
 
@@ -355,6 +373,42 @@ THEATRE_PLAY_TITLES: tuple[str, ...] = (
     "The Tempest",
     "Mr. Burns: A Post-Electric Play",
 )
+
+# --- Basket weaving (Community silo-wide class; ``bunker_social_state``) ---
+# Mandatory hours per person (UI): 0..4. No worker assignment — everyone attends.
+BASKET_WEAVING_HOURS_MAX = 4
+# Loyalty accrual per game tick second; independent of bunker population (hours down → more teamwork).
+BASKET_WEAVING_LOYALTY_PER_SECOND: tuple[float, ...] = (
+    0.0,
+    0.09,
+    0.065,
+    0.045,
+    0.028,
+)
+# Off-books cash per inhabitant per second (hours up → more covert sales; × population in ``game_tick``).
+BASKET_WEAVING_CASH_PER_PERSON_PER_SECOND: tuple[float, ...] = (
+    0.0,
+    0.001,
+    0.002,
+    0.003,
+    0.004,
+)
+
+
+def basket_weaving_hours_clamped(hours: int | None) -> int:
+    if hours is None:
+        return 0
+    return max(0, min(BASKET_WEAVING_HOURS_MAX, int(hours)))
+
+
+def basket_weaving_loyalty_per_second(hours: int | None) -> float:
+    return float(BASKET_WEAVING_LOYALTY_PER_SECOND[basket_weaving_hours_clamped(hours)])
+
+
+def basket_weaving_cash_per_second(hours: int | None, population: int) -> float:
+    h = basket_weaving_hours_clamped(hours)
+    per = float(BASKET_WEAVING_CASH_PER_PERSON_PER_SECOND[h])
+    return per * max(0, int(population))
 
 
 @dataclass(frozen=True)

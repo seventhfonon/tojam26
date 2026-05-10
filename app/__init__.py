@@ -643,6 +643,46 @@ def _ensure_bunker_social_inner_circle_cash_column() -> None:
         )
 
 
+def _ensure_bunker_social_basket_weaving_hours_column() -> None:
+    """Mandatory basket-weaving hours per resident (Community team-building silo class)."""
+    insp = inspect(db.engine)
+    if "bunker_social_state" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("bunker_social_state")}
+    if "basket_weaving_hours" in cols:
+        return
+    with db.engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE bunker_social_state ADD COLUMN basket_weaving_hours "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+
+
+def _ensure_inner_circle_members_psyche_columns() -> None:
+    """Frustration + disposition columns on inner_circle_members (Inner Circle psyche loop)."""
+    insp = inspect(db.engine)
+    if "inner_circle_members" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("inner_circle_members")}
+    with db.engine.begin() as conn:
+        if "frustration" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE inner_circle_members ADD COLUMN frustration "
+                    "DOUBLE PRECISION NOT NULL DEFAULT 40"
+                )
+            )
+        if "disposition" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE inner_circle_members ADD COLUMN disposition "
+                    "DOUBLE PRECISION NOT NULL DEFAULT 65"
+                )
+            )
+
+
 def _ensure_inner_circle_members_seed() -> None:
     """Create default Inner Circle member rows for every player."""
     from . import inner_circle
@@ -835,6 +875,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         _ensure_user_fireside_columns()
         _ensure_user_geiger_rumor_exodus_columns()
         _ensure_bunker_social_inner_circle_cash_column()
+        _ensure_bunker_social_basket_weaving_hours_column()
+        _ensure_inner_circle_members_psyche_columns()
         _ensure_inner_circle_members_seed()
         _ensure_bunker_social_last_fireside_chat_at_column()
         _ensure_bunker_theatre_play_index_column()

@@ -30,6 +30,7 @@ from .constants import (
 )
 from .models import (
     BunkerDoubt,
+    BunkerPopulation,
     BunkerProfession,
     BunkerSocialState,
     PlayerActiveEvent,
@@ -529,6 +530,84 @@ def enqueue_geiger_rumor_exodus(user_id: str, when: datetime, population_count: 
         channel=MESSAGE_CHANNEL_GROUP_CHAT,
     )
     log.info("geiger rumor exodus enqueued: user=%s quota=%s", user_id, quota)
+
+
+def enqueue_registered_event(
+    user_id: str, definition: EventDefinition, when: datetime
+) -> bool:
+    """Create ``PlayerActiveEvent`` immediately (bypass RNG / ``can_spawn``).
+
+    Used when scripted gameplay (for example Focus Tree completion) must spawn a
+    registered event. Returns ``False`` if that kind is already active or unknown.
+    """
+    if player_has_active_event_kind(user_id, definition):
+        log.info(
+            "enqueue_registered_event skipped (already active): user=%s definition=%s",
+            user_id,
+            definition,
+        )
+        return False
+    spec = spec_for_definition(definition)
+    if spec is None:
+        log.warning(
+            "enqueue_registered_event unknown definition=%s user=%s", definition, user_id
+        )
+        return False
+
+    deadline: datetime | None
+    if spec.duration_seconds is None:
+        deadline = None
+    else:
+        deadline = when + timedelta(seconds=int(spec.duration_seconds))
+
+    db.session.add(
+        PlayerActiveEvent(
+            user_id=user_id,
+            kind=spec.definition,
+            started_at=when,
+            auto_resolve_at=deadline,
+            system=spec.system,
+        )
+    )
+    spec.on_spawn(user_id, when)
+    announce_body = spec.spawn_announcement(user_id, when)
+    _post_player_message(user_id, announce_body, when, channel=MESSAGE_CHANNEL_BULLETIN)
+    if spec.spawn_group_chat_announcement is not None:
+        gc_body = spec.spawn_group_chat_announcement(user_id, when)
+        _post_player_message(user_id, gc_body, when, channel=MESSAGE_CHANNEL_GROUP_CHAT)
+    log.info(
+        "registered event manually enqueued: user=%s definition=%s duration_s=%s",
+        user_id,
+        spec.definition,
+        spec.duration_seconds,
+    )
+    return True
+
+
+def spawn_event_for_focus_completion(
+    user_id: str, definition: EventDefinition, when: datetime
+) -> None:
+    """Spawn gameplay tied to Focus Tree activation (handles special-case events)."""
+    user_row = db.session.get(User, user_id)
+    if definition == EventDefinition.RATS_SILO_INTRO:
+        if user_row is not None and user_row.silo_rats_introduced:
+            log.info(
+                "spawn_event_for_focus_completion skipped (rats intro already active in fiction): "
+                "user=%s",
+                user_id,
+            )
+            return
+    if definition == EventDefinition.GEIGER_RUMOR_EXODUS:
+        latest_pop = db.session.scalars(
+            select(BunkerPopulation)
+            .where(BunkerPopulation.user_id == user_id)
+            .order_by(BunkerPopulation.timestamp.desc())
+            .limit(1)
+        ).first()
+        pop_count = latest_pop.count if latest_pop is not None else 0
+        enqueue_geiger_rumor_exodus(user_id, when, pop_count)
+        return
+    enqueue_registered_event(user_id, definition, when)
 
 
 def geiger_rumor_forced_departures_this_tick(user_id: str, tick_time: datetime) -> int:
