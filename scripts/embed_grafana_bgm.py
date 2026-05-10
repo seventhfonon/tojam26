@@ -20,6 +20,7 @@ MARKER_END = "<!--/silo-bgm-injected-->"
 
 DASHBOARDS: list[str] = [
     "grafana/dashboards/environment.json",
+    "grafana/dashboards/population.json",
     "grafana/dashboards/power.json",
     "grafana/dashboards/farming.json",
     "grafana/dashboards/community.json",

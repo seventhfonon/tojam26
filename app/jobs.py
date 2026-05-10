@@ -487,9 +487,19 @@ def elapsed_seconds_for_game_tick(
     return max(0.0, elapsed_seconds)
 
 
-def noisy_radiation_display(true_level: float, noise_max: float) -> float:
-    """Player-facing reading: truth plus uniform jitter in ``[-noise_max, noise_max]``."""
-    offset = random.uniform(-noise_max, noise_max)
+def noisy_radiation_display(true_level: float) -> float:
+    """Player-facing reading: truth plus uniform jitter whose half-range scales with truth.
+
+    At ``INITIAL_RADIATION`` the jitter matches ``±RADIATION_DISPLAY_NOISE_MAX`` rads; it
+    falls toward zero as outdoor radiation approaches zero.
+    """
+    ref = float(constants.INITIAL_RADIATION)
+    noise_half_range = (
+        0.0
+        if ref <= 0
+        else constants.RADIATION_DISPLAY_NOISE_MAX * max(0.0, float(true_level)) / ref
+    )
+    offset = random.uniform(-noise_half_range, noise_half_range)
     return max(0.0, true_level + offset)
 
 
@@ -507,7 +517,6 @@ def handle_radiation_decay(
     latest_radiation_level: RadiationLevel,
     elapsed_seconds: float,
     decay_half_life_seconds: float,
-    display_noise_max: float,
     tick_time: datetime,
 ) -> None:
     new_radiation_level = radiation_truth_after_decay(
@@ -515,7 +524,7 @@ def handle_radiation_decay(
         elapsed_seconds,
         decay_half_life_seconds,
     )
-    new_display = noisy_radiation_display(new_radiation_level, display_noise_max)
+    new_display = noisy_radiation_display(new_radiation_level)
     db.session.add(
         RadiationLevel(
             user_id=user_id,
@@ -1058,7 +1067,6 @@ def game_tick(app: Flask) -> None:
     """
     with app.app_context():
         decay_half_life_seconds = constants.DECAY_HALF_LIFE_SECONDS
-        radiation_display_noise_max = constants.RADIATION_DISPLAY_NOISE_MAX
         radiation_safe_threshold = constants.RADIATION_SAFE_THRESHOLD
         base_departure_rate = constants.BASE_DEPARTURE_RATE
         crank_workers_loyalty_threshold = constants.CRANK_WORKERS_LOYALTY_THRESHOLD
@@ -1120,7 +1128,6 @@ def game_tick(app: Flask) -> None:
                 readings.latest_radiation_level,
                 elapsed_seconds,
                 decay_half_life_seconds,
-                radiation_display_noise_max,
                 tick_time,
             )
 

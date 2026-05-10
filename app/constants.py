@@ -97,7 +97,8 @@ INVESTIGATION_DISPATCH_BY_SYSTEM: dict[str, InvestigationDispatchConfig] = {
 # course of a play session while still feeling like an environmental
 # measurement rather than a countdown.
 INITIAL_RADIATION = 100.0
-# Uniform jitter ± this many rads on ``level_display`` each sample (truth stays in ``level``).
+# Half-range of uniform jitter on ``level_display`` when truth equals ``INITIAL_RADIATION``;
+# variance scales down linearly as outdoor truth decays (truth stays in ``level``).
 RADIATION_DISPLAY_NOISE_MAX = 10.0
 DECAY_TICK_SECONDS = 1
 DECAY_HALF_LIFE_SECONDS = 600

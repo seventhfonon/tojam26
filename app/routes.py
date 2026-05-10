@@ -419,11 +419,10 @@ def _create_player() -> User:
     user = User(id=str(uuid4()))
     db.session.add(user)
     true_rad = constants.INITIAL_RADIATION
-    noise_max = constants.RADIATION_DISPLAY_NOISE_MAX
     db.session.add(RadiationLevel(
         user_id=user.id,
         level=true_rad,
-        level_display=noisy_radiation_display(true_rad, noise_max),
+        level_display=noisy_radiation_display(true_rad),
     ))
     db.session.add(BunkerPopulation(
         user_id=user.id,
