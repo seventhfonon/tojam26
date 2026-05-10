@@ -8,7 +8,7 @@
   Tab nav uses <a> links, not buttons — no click SFX unless you add role=button or
   call window.__SILO_SFX__.play(...). Per-control: data-sfx="<id>" or data-sfx="none".
 
-  Embedded in the Silo Command nav row by embed_grafana_bgm.py (right-aligned).
+  Embedded in the Silo Command bar by embed_grafana_bgm.py (audio column; nav links flex beside it).
   Playback pauses when the browser tab is hidden (visibility API) or when you
   navigate to another dashboard (singleton). Same track URL reuses the existing
   Audio instance when Grafana remounts the nav panel so BGM does not restart.
@@ -17,6 +17,7 @@
 .silo-bgm-bar {
   font-family: Inter, sans-serif;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 6px 10px;
@@ -28,7 +29,6 @@
   font-size: 12px;
 }
 .silo-bgm-bar--nav {
-  margin-left: auto;
   flex-shrink: 0;
 }
 .silo-bgm-bar button {
