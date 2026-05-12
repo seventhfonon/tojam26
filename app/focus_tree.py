@@ -12,6 +12,7 @@ from datetime import datetime
 from sqlalchemy import select
 
 from . import constants
+from . import strings
 from .events import EventDefinition, spawn_event_for_focus_completion
 from .extensions import db
 from .models import (
@@ -40,89 +41,63 @@ class FocusNodeDef:
 FOCUS_TREE_NODES: tuple[FocusNodeDef, ...] = (
     FocusNodeDef(
         id="ft_explore_novel_food_sources",
-        title="Explore Novel Food Sources",
-        description=(
-            "The infestation of vermin in our food storage presents a risk and an opportunity. "
-            "We need not let valuable resources go to waste."
-        ),
-        requirements="No prerequisites.",
+        title=strings.FOCUS_TITLE_EXPLORE_NOVEL_FOOD,
+        description=strings.FOCUS_DESC_EXPLORE_NOVEL_FOOD,
+        requirements=strings.FOCUS_REQ_EXPLORE_NOVEL_FOOD,
         parent_ids=(),
         completion_hook="rat_trappers_unlock",
     ),
     FocusNodeDef(
         id="ft_fireside_chats",
-        title="Fireside Chats",
-        description=(
-            "Structured morale broadcasts beyond a single reassuring tone — rotate framing "
-            "without letting rumor own the silence between drills."
-        ),
-        requirements="Complete Explore Novel Food Sources. Give Speech once after the rumor exodus crisis ends.",
+        title=strings.FOCUS_TITLE_FIRESIDE_CHATS,
+        description=strings.FOCUS_DESC_FIRESIDE_CHATS,
+        requirements=strings.FOCUS_REQ_FIRESIDE_CHATS,
         parent_ids=("ft_explore_novel_food_sources",),
         predicate_key="fireside_chats_gate",
     ),
     FocusNodeDef(
         id="ft_bunker_shakespeare_company",
-        title="Found Bunker Shakespeare Company",
-        description=(
-            "Formalize ad-hoc readings into a resident theatre cadre — boredom relief that "
-            "does not pretend the outside world is hypothetical."
-        ),
-        requirements=(
-            "Complete Explore Novel Food Sources. Unlocks when bunker loyalty falls below "
-            f"{constants.SHAKESPEARE_FOCUS_LOYALTY_BELOW:.0f}% or boredom rises above "
-            f"{constants.SHAKESPEARE_FOCUS_BOREDOM_ABOVE:.0f}."
+        title=strings.FOCUS_TITLE_BUNKER_SHAKESPEARE,
+        description=strings.FOCUS_DESC_BUNKER_SHAKESPEARE,
+        requirements=strings.FOCUS_REQ_BUNKER_SHAKESPEARE_TEMPLATE.format(
+            loyalty_below=constants.SHAKESPEARE_FOCUS_LOYALTY_BELOW,
+            boredom_above=constants.SHAKESPEARE_FOCUS_BOREDOM_ABOVE,
         ),
         parent_ids=("ft_explore_novel_food_sources",),
         predicate_key="bunker_shakespeare_gate",
     ),
     FocusNodeDef(
         id="ft_venture_out",
-        title="Venture Out",
-        description=(
-            "Acknowledge that some trusted voices will test the threshold themselves — "
-            "and prepare the Inner Circle for harder bargains indoors."
-        ),
-        requirements=(
-            "Complete Fireside Chats and Found Bunker Shakespeare Company. Unlocks when "
-            "population drops below two-thirds of the original headcount."
-        ),
+        title=strings.FOCUS_TITLE_VENTURE_OUT,
+        description=strings.FOCUS_DESC_VENTURE_OUT,
+        requirements=strings.FOCUS_REQ_VENTURE_OUT,
         parent_ids=("ft_fireside_chats", "ft_bunker_shakespeare_company"),
         predicate_key="venture_out_gate",
         completion_hook="venture_out_narrative",
     ),
     FocusNodeDef(
         id="ft_worse_than_being_exploited",
-        title="The only thing worse than being exploited…",
-        description=(
-            "When operating cash nearly bottoms out, sanction short off-books labor — "
-            "with explicit consent windows per Inner Circle member."
-        ),
-        requirements=(
-            f"Complete Venture Out. Unlocks when Inner Circle cash falls below "
-            f"${constants.TEMP_JOB_FOCUS_CASH_THRESHOLD:.0f}."
+        title=strings.FOCUS_TITLE_WORSE_THAN_EXPLOITED,
+        description=strings.FOCUS_DESC_WORSE_THAN_EXPLOITED,
+        requirements=strings.FOCUS_REQ_TEMP_JOB_BRANCH_TEMPLATE.format(
+            cash_threshold=constants.TEMP_JOB_FOCUS_CASH_THRESHOLD,
         ),
         parent_ids=("ft_venture_out",),
         predicate_key="cash_below_temp_threshold_gate",
     ),
     FocusNodeDef(
         id="ft_not_being_exploited",
-        title="…is not being exploited.",
-        description=(
-            "A temp job goes sideways in public view — convert the sting into doctrine "
-            "about boundaries, receipts, and rotation."
-        ),
-        requirements="Complete Venture Out. Unlocks after a Temp Job backfires (doubt spike outcome).",
+        title=strings.FOCUS_TITLE_NOT_BEING_EXPLOITED,
+        description=strings.FOCUS_DESC_NOT_BEING_EXPLOITED,
+        requirements=strings.FOCUS_REQ_NOT_BEING_EXPLOITED,
         parent_ids=("ft_venture_out",),
         predicate_key="temp_job_backfire_gate",
     ),
     FocusNodeDef(
         id="ft_fire_and_brimstone",
-        title="Fire and Brimstone",
-        description=(
-            "Escalate broadcast rhetoric into explicit moral geometry — shorter cadence, "
-            "sharper binaries, less room for corridor improvisation."
-        ),
-        requirements="Complete both exploitation-branch focuses.",
+        title=strings.FOCUS_TITLE_FIRE_AND_BRIMSTONE,
+        description=strings.FOCUS_DESC_FIRE_AND_BRIMSTONE,
+        requirements=strings.FOCUS_REQ_FIRE_AND_BRIMSTONE,
         parent_ids=("ft_worse_than_being_exploited", "ft_not_being_exploited"),
     ),
 )
@@ -244,10 +219,7 @@ def _hook_rat_trappers_unlock(user_id: str, when: datetime) -> None:
         row.rat_trappers_unlocked = True
     _post_player_message(
         user_id,
-        (
-            "Quartermaster signed off on vermin-control staffing: trapper shifts are authorized "
-            "under Farming allocations — recover what the infestation would waste."
-        ),
+        strings.MESSAGE_RAT_TRAPPERS_UNLOCKED,
         when,
         channel=MESSAGE_CHANNEL_BULLETIN,
     )

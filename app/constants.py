@@ -1,5 +1,7 @@
 """Game tuning — single source of truth. Import ``app.constants`` in routes, jobs, etc.
 
+Player-visible prose (bulletins, events, focus tree copy, labels) lives in ``app.strings``.
+
 Infrastructure (DB URL, secrets, Grafana base URL) lives in ``app.config.Config``.
 Random subsystem events are defined as ``GameEventSpec`` rows in ``app.events``
 (callable spawn gates and outcomes plus numeric odds/durations/multipliers).
@@ -8,6 +10,14 @@ Random subsystem events are defined as ``GameEventSpec`` rows in ``app.events``
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from .strings import (
+    GAME_SYSTEM_LABELS,
+    INNER_CIRCLE_MEMBER_NAMES,
+    MOVIE_TITLES_BY_ID,
+    THEATRE_PLAY_TITLES,
+    VENTURE_OUT_FAREWELL_MESSAGE,
+)
 
 # --- Game systems (Grafana subsystem dashboards) ---
 GAME_SYSTEM_ENVIRONMENT = "environment"
@@ -23,13 +33,6 @@ GAME_SYSTEM_IDS: frozenset[str] = frozenset(
         GAME_SYSTEM_SOCIAL,
     }
 )
-
-GAME_SYSTEM_LABELS: dict[str, str] = {
-    GAME_SYSTEM_ENVIRONMENT: "Environment sensors",
-    GAME_SYSTEM_POWER: "Power systems",
-    GAME_SYSTEM_FARMING: "Farming & silos",
-    GAME_SYSTEM_SOCIAL: "Community programs",
-}
 
 
 def normalize_game_system_id(raw: str | None) -> str | None:
@@ -188,6 +191,11 @@ ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE = 0.06
 # Bad Apple clip: PNG sequence under ``app/assets/images/bad_apple`` (``frame_00.png`` …).
 # When all frames exist, the heatmap uses one frame per scheduler tick (see ``game_tick``).
 BAD_APPLE_FRAME_COUNT = 20
+# Between **starts** of static-reference (goat) interruptions on that clip (~mean ± jitter seconds).
+ENVIRONMENT_PIXEL_GOAT_BREAK_INTERVAL_MEAN_SECONDS = 30
+ENVIRONMENT_PIXEL_GOAT_BREAK_INTERVAL_JITTER_SECONDS = 5
+# Length of each interruption (static ``environment_pixel_reference.png`` instead of Bad Apple).
+ENVIRONMENT_PIXEL_GOAT_BREAK_DURATION_SECONDS = 5
 
 # Social dashboard theater heatmap: same strip geometry as environment pixels.
 # Keep ``social_movie_heatmap_history_seconds`` on the Social Grafana dashboard equal to
@@ -224,13 +232,6 @@ INITIAL_DOUBT = 45.0
 INITIAL_INNER_CIRCLE_LOYALTY = 50
 
 # --- Inner Circle (per-member simulation; Silo: Inner Circle dashboard) ---
-INNER_CIRCLE_MEMBER_NAMES: tuple[str, ...] = (
-    "Marnie Coldwell",
-    "Jace Orbin",
-    "Vesper Kline",
-    "Tamsin Greer",
-    "Nadia Firth",
-)
 INNER_CIRCLE_MEMBER_COUNT = len(INNER_CIRCLE_MEMBER_NAMES)
 # Starting liquid currency for new bunker sessions (Inner Circle dashboard).
 INITIAL_INNER_CIRCLE_CASH = 50.0
@@ -240,22 +241,6 @@ VENTURE_OUT_DEPARTING_MEMBER_SLOT = 2
 SHAKESPEARE_FOCUS_LOYALTY_BELOW = 75.0
 SHAKESPEARE_FOCUS_BOREDOM_ABOVE = 15.0
 TEMP_JOB_FOCUS_CASH_THRESHOLD = 20.0
-VENTURE_OUT_FAREWELL_MESSAGE = (
-    "{name}: I've said three versions of this message aloud in an empty stairwell and deleted them all. "
-    "I'm going up on my own terms — not because I believe the sermons about ash gardens, but because "
-    "I can't keep translating radiation curves into bedtime stories for adults who deserve harder truths "
-    "than I know how to speak.\n\n"
-    "The hatch crew knows I've been practicing the route — tell them not to pretend surprise. "
-    "I'll carry the handheld dosimeter we calibrated together last quarter; if it screams, I'll treat "
-    "that as data, not drama. If it stays quiet longer than any of us dare hope, I'll send one terse ping "
-    "on the old scout frequency — not poetry, just coordinates and weather smell — then I'll go dark so "
-    "you don't mistake honesty for recruitment.\n\n"
-    "Don't deputize my empty chair into mythology. Leave my ration ledger open: I wasn't stealing; I was "
-    "padding slack for nights nobody thanked me for covering. If loyalty still counts for anything, waste "
-    "that surplus on someone who's afraid to ask.\n\n"
-    "I'm stepping through the lock now. Hold your arguments until the pumps finish their cycle — "
-    "the hiss is the closest thing we have to a blessing."
-)
 
 INNER_CIRCLE_INITIAL_MEMBER_LOYALTIES: tuple[float, ...] = (58.0, 62.0, 60.0, 59.0, 61.0)
 INNER_CIRCLE_INITIAL_MEMBER_POPULARITIES: tuple[float, ...] = (52.0, 48.0, 55.0, 50.0, 53.0)
@@ -399,12 +384,6 @@ THEATRE_PHASE_WRITING = "writing"
 THEATRE_PHASE_REHEARSING = "rehearsing"
 THEATRE_PHASE_READY = "ready"
 
-THEATRE_PLAY_TITLES: tuple[str, ...] = (
-    "King Lear",
-    "The Tempest",
-    "Mr. Burns: A Post-Electric Play",
-)
-
 # --- Basket weaving (Community silo-wide class; ``bunker_social_state``) ---
 # Mandatory hours per person (UI): 0..4. No worker assignment — everyone attends.
 BASKET_WEAVING_HOURS_MAX = 4
@@ -456,28 +435,28 @@ class MovieSpec:
 MOVIES: tuple[MovieSpec, ...] = (
     MovieSpec(
         id="atomic_cafe",
-        title="The Atomic Cafe",
+        title=MOVIE_TITLES_BY_ID["atomic_cafe"],
         energy_cost=4.0,
         boredom_relief_base=11.0,
         doubt_relief_base=38.0,
     ),
     MovieSpec(
         id="the_day_after",
-        title="The Day After",
+        title=MOVIE_TITLES_BY_ID["the_day_after"],
         energy_cost=4.0,
         boredom_relief_base=21.0,
         doubt_relief_base=30.0,
     ),
     MovieSpec(
         id="mad_max",
-        title="Mad Max",
+        title=MOVIE_TITLES_BY_ID["mad_max"],
         energy_cost=7.5,
         boredom_relief_base=32.0,
         doubt_relief_base=17.0,
     ),
     MovieSpec(
         id="simpsons_s06e14_barts_comet",
-        title='Simpsons S6E14 "Bart\'s Comet"',
+        title=MOVIE_TITLES_BY_ID["simpsons_s06e14_barts_comet"],
         energy_cost=1.2,
         boredom_relief_base=9.0,
         doubt_relief_base=0.0,

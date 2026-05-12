@@ -56,6 +56,7 @@ from .events import (
 )
 from .jobs import (
     current_bad_apple_frame_index,
+    environment_pixel_goat_break_active_at,
     noisy_radiation_display,
     normalize_worker_assignments,
     record_environment_pixel_noise_sample,
@@ -90,7 +91,19 @@ from .professions import (
     PROFESSION_RAT_TRAPPING,
     PROFESSION_THEATRE,
 )
-from .social_flavor import NEGATIVE_COUNCIL_MESSAGES, POSITIVE_COUNCIL_MESSAGES
+from .strings import (
+    FIRESIDE_LABEL_BRIMSTONE_FEAR,
+    FIRESIDE_LABEL_BRIMSTONE_FRANK,
+    FIRESIDE_LABEL_BRIMSTONE_REASSURING,
+    FIRESIDE_PANEL_TITLE_BRIMSTONE,
+    FIRESIDE_PANEL_TITLE_FIRESIDE_CHATS,
+    FIRESIDE_PANEL_TITLE_GIVE_SPEECH,
+    FIRESIDE_STOCK_LABEL_FEARMONGERING,
+    FIRESIDE_STOCK_LABEL_FRANK,
+    FIRESIDE_STOCK_LABEL_REASSURING,
+    NEGATIVE_COUNCIL_MESSAGES,
+    POSITIVE_COUNCIL_MESSAGES,
+)
 
 
 log = logging.getLogger(__name__)
@@ -425,31 +438,31 @@ def _fireside_ui_bundle(user_id: str) -> dict[str, object]:
     frank = constants.FIRESIDE_KIND_FRANK
     fear = constants.FIRESIDE_KIND_FEARMONGERING
     stock_labels = {
-        reassuring: "Reassuring",
-        frank: "Frank",
-        fear: "Fearmongering",
+        reassuring: FIRESIDE_STOCK_LABEL_REASSURING,
+        frank: FIRESIDE_STOCK_LABEL_FRANK,
+        fear: FIRESIDE_STOCK_LABEL_FEARMONGERING,
     }
     all_enabled = {reassuring: True, frank: True, fear: True}
     if "ft_fire_and_brimstone" in done:
         return {
-            "panel_title": "Fire and Brimstone",
+            "panel_title": FIRESIDE_PANEL_TITLE_BRIMSTONE,
             "cooldown_seconds": int(constants.FIRESIDE_BRIMSTONE_COOLDOWN_SECONDS),
             "labels": {
-                reassuring: "Everyone outside is a sinner",
-                frank: "We are all sinners",
-                fear: "You are all sinners",
+                reassuring: FIRESIDE_LABEL_BRIMSTONE_REASSURING,
+                frank: FIRESIDE_LABEL_BRIMSTONE_FRANK,
+                fear: FIRESIDE_LABEL_BRIMSTONE_FEAR,
             },
             "kind_enabled": dict(all_enabled),
         }
     if "ft_fireside_chats" in done:
         return {
-            "panel_title": "Fireside Chats",
+            "panel_title": FIRESIDE_PANEL_TITLE_FIRESIDE_CHATS,
             "cooldown_seconds": int(constants.FIRESIDE_CHAT_COOLDOWN_SECONDS),
             "labels": dict(stock_labels),
             "kind_enabled": dict(all_enabled),
         }
     return {
-        "panel_title": "Give Speech",
+        "panel_title": FIRESIDE_PANEL_TITLE_GIVE_SPEECH,
         "cooldown_seconds": int(constants.FIRESIDE_GIVE_SPEECH_COOLDOWN_SECONDS),
         "labels": dict(stock_labels),
         "kind_enabled": {
@@ -510,12 +523,14 @@ def _create_player() -> User:
         )
     )
     inner_circle.seed_members_for_user_if_needed(user.id)
+    now = datetime.now(timezone.utc)
     record_environment_pixel_noise_sample(
         user.id,
-        datetime.now(timezone.utc),
+        now,
         current_bad_apple_frame_index(),
+        use_reference_image=environment_pixel_goat_break_active_at(now),
     )
-    record_social_movie_pixel_sample(user.id, datetime.now(timezone.utc))
+    record_social_movie_pixel_sample(user.id, now)
     db.session.commit()
     return user
 

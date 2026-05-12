@@ -18,6 +18,7 @@ from sqlalchemy import select
 
 from .extensions import db
 from .constants import MESSAGE_CHANNEL_BULLETIN
+from .strings import NARRATIVE_FIRST_DEPARTURE_NOTICE, NARRATIVE_WELCOME_MESSAGE
 from .models import SystemMessage, UserNarrativeDelivery
 
 
@@ -57,19 +58,12 @@ def _trigger_welcome_message(ctx: NarrativeContext) -> bool:
 NARRATIVE_MESSAGES: tuple[NarrativeMessage, ...] = (
     NarrativeMessage(
         id="first_departure_notice",
-        text=(
-            "!A community member has decided to brave the outdoors and leave the bunker. "
-            "More may follow."
-        ),
+        text=NARRATIVE_FIRST_DEPARTURE_NOTICE,
         trigger=_trigger_first_departure_notice,
     ),
     NarrativeMessage(
         id="welcome_message",
-        text=(
-            "Welcome to Bunker.OS 1.2.0. "
-            "If you are reading this message, a nuclear apocalypse has occurred. "
-            "It is not safe to go outside."
-        ),
+        text=NARRATIVE_WELCOME_MESSAGE,
         trigger=_trigger_welcome_message,
     ),
 )

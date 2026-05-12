@@ -68,6 +68,7 @@ from .events import (
     try_spawn_event,
 )
 from .narrative import NarrativeContext, deliver_pending_narrative_messages
+from .strings import TEST_SYSTEM_MESSAGE_BODY
 
 
 log = logging.getLogger(__name__)
@@ -195,6 +196,53 @@ def _facilities_ready(readings: GameTickReadings) -> bool:
 
 _bad_apple_frame_seq = 0
 
+_env_pixel_goat_break_end: datetime | None = None
+_env_pixel_next_goat_break_start: datetime | None = None
+
+
+def _random_environment_pixel_goat_break_period_seconds() -> float:
+    """Wall-clock spacing between consecutive **starts** of goat interruptions."""
+    mean = float(constants.ENVIRONMENT_PIXEL_GOAT_BREAK_INTERVAL_MEAN_SECONDS)
+    jitter = float(constants.ENVIRONMENT_PIXEL_GOAT_BREAK_INTERVAL_JITTER_SECONDS)
+    dur = float(constants.ENVIRONMENT_PIXEL_GOAT_BREAK_DURATION_SECONDS)
+    period = mean + random.uniform(-jitter, jitter)
+    return max(dur + 1.0, period)
+
+
+def environment_pixel_goat_break_active_at(t: datetime) -> bool:
+    """True if ``t`` falls in a scheduled goat break (for routes / reads without advancing state)."""
+    return _env_pixel_goat_break_end is not None and t < _env_pixel_goat_break_end
+
+
+def step_environment_pixel_goat_break_schedule(tick_time: datetime) -> bool:
+    """Advance heatmap goat-interruption schedule; call exactly once per ``game_tick``.
+
+    Returns True when this tick should render the static reference image instead of Bad Apple.
+    """
+    global _env_pixel_goat_break_end, _env_pixel_next_goat_break_start
+    dur_s = float(constants.ENVIRONMENT_PIXEL_GOAT_BREAK_DURATION_SECONDS)
+    duration = timedelta(seconds=dur_s)
+
+    if _env_pixel_goat_break_end is not None:
+        if tick_time < _env_pixel_goat_break_end:
+            return True
+        _env_pixel_goat_break_end = None
+        period = _random_environment_pixel_goat_break_period_seconds()
+        gap_after_end = max(1.0, period - dur_s)
+        _env_pixel_next_goat_break_start = tick_time + timedelta(seconds=gap_after_end)
+
+    if _env_pixel_next_goat_break_start is None:
+        _env_pixel_next_goat_break_start = tick_time + timedelta(
+            seconds=_random_environment_pixel_goat_break_period_seconds()
+        )
+
+    if tick_time >= _env_pixel_next_goat_break_start:
+        _env_pixel_goat_break_end = tick_time + duration
+        _env_pixel_next_goat_break_start = None
+        return True
+
+    return False
+
 
 def advance_bad_apple_frame_index() -> int:
     """Consume the next Bad Apple frame index (one step per ``game_tick``)."""
@@ -219,12 +267,15 @@ def record_environment_pixel_noise_sample(
     user_id: str,
     tick_time: datetime,
     animation_frame_index: int = 0,
+    *,
+    use_reference_image: bool = False,
 ) -> None:
     """Replace this player's heatmap history with Bad Apple, reference-image luminance, or random noise.
 
     When ``app/assets/images/bad_apple`` contains ``frame_00.png`` … (see ``BAD_APPLE_FRAME_COUNT``),
-    ``animation_frame_index`` selects the clip frame. Otherwise falls back to
-    ``environment_pixel_reference.png``, then uniform random noise.
+    ``animation_frame_index`` selects the clip frame unless ``use_reference_image`` forces the static
+    reference path (``environment_pixel_reference.png``). Otherwise falls back to that PNG, then
+    uniform random noise.
     ``ENVIRONMENT_PIXEL_REFERENCE_TICK_NOISE_HALF_RANGE`` jitter applies to sampled luminance frames.
     """
     cols_n = int(constants.ENVIRONMENT_PIXEL_GRID_COLS)
@@ -234,11 +285,13 @@ def record_environment_pixel_noise_sample(
     delta_s = span_s / max(1, n_snapshots - 1) if n_snapshots > 1 else 0.0
 
     frame: list[list[float]]
-    ba = (
-        bad_apple_frames.bad_apple_cells(animation_frame_index, cols_n, rows_n)
-        if bad_apple_frames.bad_apple_frames_ready()
-        else None
-    )
+    ba = None
+    if not use_reference_image:
+        ba = (
+            bad_apple_frames.bad_apple_cells(animation_frame_index, cols_n, rows_n)
+            if bad_apple_frames.bad_apple_frames_ready()
+            else None
+        )
     if ba is not None:
         frame = [list(row) for row in ba]
         apply_uniform_tick_noise(
@@ -1085,6 +1138,7 @@ def game_tick(app: Flask) -> None:
             return
 
         bad_apple_frame_idx = advance_bad_apple_frame_index()
+        env_pixel_goat_break = step_environment_pixel_goat_break_schedule(tick_time)
 
         processed_user_count = 0
         gamestate_snapshots: list[dict[str, object]] = []
@@ -1355,7 +1409,12 @@ def game_tick(app: Flask) -> None:
             record_bunker_profession_snapshots(
                 user_id, post_pop, readings, tick_time
             )
-            record_environment_pixel_noise_sample(user_id, tick_time, bad_apple_frame_idx)
+            record_environment_pixel_noise_sample(
+                user_id,
+                tick_time,
+                bad_apple_frame_idx,
+                use_reference_image=env_pixel_goat_break,
+            )
             record_social_movie_pixel_sample(user_id, tick_time)
 
             deliver_pending_narrative_messages(
@@ -1485,7 +1544,7 @@ def post_test_message(app: Flask) -> None:
         for user in users:
             db.session.add(SystemMessage(
                 user_id=user.id,
-                body="All systems normal.",
+                body=TEST_SYSTEM_MESSAGE_BODY,
                 timestamp=now,
                 channel=constants.MESSAGE_CHANNEL_BULLETIN,
             ))

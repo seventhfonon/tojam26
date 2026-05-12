@@ -22,11 +22,35 @@ from flask import has_app_context
 from .extensions import db
 from . import constants as game_constants
 from .constants import (
-    GAME_SYSTEM_LABELS,
     INVESTIGATION_DISPATCH_BY_SYSTEM,
     MESSAGE_CHANNEL_BULLETIN,
     MESSAGE_CHANNEL_GROUP_CHAT,
     normalize_game_system_id,
+)
+from .strings import (
+    EVENT_FIRESIDE_BACKLASH_AUTO_RESOLVE_GROUP_CHAT,
+    EVENT_FIRESIDE_BACKLASH_AUTO_RESOLVE_MESSAGE,
+    EVENT_FIRESIDE_BACKLASH_SPAWN_ANNOUNCE,
+    EVENT_FIRESIDE_BACKLASH_SPAWN_GROUP_CHAT,
+    EVENT_GEIGER_EXODUS_AUTO_RESOLVE_GROUP_CHAT,
+    EVENT_GEIGER_EXODUS_AUTO_RESOLVE_MESSAGE,
+    EVENT_GEIGER_RUMOR_EXODUS_BULLETIN,
+    EVENT_GEIGER_RUMOR_EXODUS_GROUP_CHAT,
+    EVENT_RATS_SILO_INTRO_AUTO_RESOLVE_GROUP_CHAT,
+    EVENT_RATS_SILO_INTRO_AUTO_RESOLVE_MESSAGE,
+    EVENT_RATS_SILO_INTRO_PLAYER_RESOLVE_GROUP_CHAT,
+    EVENT_RATS_SILO_INTRO_PLAYER_RESOLVE_MESSAGE,
+    EVENT_RATS_SILO_INTRO_SPAWN_ANNOUNCE,
+    EVENT_RATS_SILO_INTRO_SPAWN_GROUP_CHAT,
+    EVENT_RATS_SILO_SPIKE_AUTO_RESOLVE_GROUP_CHAT,
+    EVENT_RATS_SILO_SPIKE_AUTO_RESOLVE_MESSAGE,
+    EVENT_RATS_SILO_SPIKE_PLAYER_RESOLVE_GROUP_CHAT,
+    EVENT_RATS_SILO_SPIKE_PLAYER_RESOLVE_MESSAGE,
+    EVENT_RATS_SILO_SPIKE_SPAWN_GROUP_CHAT,
+    GAME_SYSTEM_LABELS,
+    INVESTIGATION_FALLBACK_SUBSYSTEM_LABEL,
+    ROUTINE_INVESTIGATION_COMPLETE_TEMPLATE,
+    ROUTINE_INVESTIGATION_DISPATCH_TEMPLATE,
 )
 from .models import (
     BunkerDoubt,
@@ -68,15 +92,6 @@ class EventDefinition(StrEnum):
     RATS_SILO = "rats_silo"
     FIRESIDE_RHETORIC_BACKLASH = "fireside_rhetoric_backlash"
     GEIGER_RUMOR_EXODUS = "geiger_rumor_exodus"
-
-ROUTINE_INVESTIGATION_DISPATCH_TEMPLATE = (
-    "{n} residents detached for scheduled sweep of {subsystem}. "
-    "They sign back in when the round completes."
-)
-ROUTINE_INVESTIGATION_COMPLETE_TEMPLATE = (
-    "Sweep detail returned from {subsystem}. Routine checklist filed with nothing escalated."
-)
-
 
 @dataclass(frozen=True)
 class EventSpawnContext:
@@ -203,26 +218,16 @@ def _can_spawn_rats_silo_spike(ctx: EventSpawnContext) -> bool:
 def _rats_silo_intro_auto_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
     return EventOutcome(
         loyalty_delta=-2.0,
-        message=(
-            "The intrusion settled into a chronic nuisance: small gnaw-holes "
-            "and scattered husks, but bulk stores appear intact for now."
-        ),
-        group_chat_message=(
-            "Marnie: Chronic nuisance beats a panic — still, lock rotation on the grain bays."
-        ),
+        message=EVENT_RATS_SILO_INTRO_AUTO_RESOLVE_MESSAGE,
+        group_chat_message=EVENT_RATS_SILO_INTRO_AUTO_RESOLVE_GROUP_CHAT,
     )
 
 
 def _rats_silo_intro_player_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
     return EventOutcome(
         loyalty_delta=3.0,
-        message=(
-            "Containment sealed the breach path and laid deterrent lines; "
-            "morale improved once crews proved the bulk grain stayed accounted."
-        ),
-        group_chat_message=(
-            "Tamsin: That sweep reads honest — crews counted sacks before we spun the story."
-        ),
+        message=EVENT_RATS_SILO_INTRO_PLAYER_RESOLVE_MESSAGE,
+        group_chat_message=EVENT_RATS_SILO_INTRO_PLAYER_RESOLVE_GROUP_CHAT,
     )
 
 
@@ -231,16 +236,11 @@ def _rats_silo_intro_after_player_resolve(_user_id: str, _tick_time: datetime) -
 
 
 def _rats_silo_intro_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
-    return (
-        "!RATS! Grain-room telemetry flagged vibration behind the inner jacket — "
-        "rats have breached the silo liner. We may be able to salvage something by investigating food storage."
-    )
+    return EVENT_RATS_SILO_INTRO_SPAWN_ANNOUNCE
 
 
 def _rats_silo_intro_spawn_group_chat(_user_id: str, _tick_time: datetime) -> str | None:
-    return (
-        "Vesper (quiet): Grain telemetry isn't lying — we need eyes in food storage before rumor does it for us."
-    )
+    return EVENT_RATS_SILO_INTRO_SPAWN_GROUP_CHAT
 
 
 def _noop_on_spawn(_user_id: str, _tick_time: datetime) -> None:
@@ -258,26 +258,16 @@ def _rats_silo_intro_on_spawn(user_id: str, _tick_time: datetime) -> None:
 def _rats_silo_spike_auto_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
     return EventOutcome(
         loyalty_delta=-5.0,
-        message=(
-            "The rat swarm dispersed after exhausting scattered grain. "
-            "Residents are unhappy about the wasted supplies."
-        ),
-        group_chat_message=(
-            "Nadia: Swarm ate our slack — next time we don't wait on paperwork to kill lights near spillage."
-        ),
+        message=EVENT_RATS_SILO_SPIKE_AUTO_RESOLVE_MESSAGE,
+        group_chat_message=EVENT_RATS_SILO_SPIKE_AUTO_RESOLVE_GROUP_CHAT,
     )
 
 
 def _rats_silo_spike_player_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
     return EventOutcome(
         loyalty_delta=4.0,
-        message=(
-            "Investigation team cleared the silo breach and salvaged "
-            "most of the spillage. Morale improved."
-        ),
-        group_chat_message=(
-            "Jace: Salvage numbers match the manifest — that's the kind of proof people remember."
-        ),
+        message=EVENT_RATS_SILO_SPIKE_PLAYER_RESOLVE_MESSAGE,
+        group_chat_message=EVENT_RATS_SILO_SPIKE_PLAYER_RESOLVE_GROUP_CHAT,
     )
 
 
@@ -286,9 +276,7 @@ def _rats_silo_spike_spawn_announce(_user_id: str, _tick_time: datetime) -> str 
 
 
 def _rats_silo_spike_spawn_group_chat(_user_id: str, _tick_time: datetime) -> str | None:
-    return (
-        "Vesper: Spike signature on IR — that's not background noise, that's a corridor moving."
-    )
+    return EVENT_RATS_SILO_SPIKE_SPAWN_GROUP_CHAT
 
 
 def _rats_silo_intro_tick_effects(_user_id: str, _tick_time: datetime) -> EventTickEffects:
@@ -310,12 +298,8 @@ def _fireside_backlash_tick_effects(_user_id: str, _tick_time: datetime) -> Even
 def _fireside_backlash_auto_resolve(_user_id: str, _tick_time: datetime) -> EventOutcome:
     return EventOutcome(
         loyalty_delta=0.0,
-        message=(
-            "Whispers about your last broadcast fade into the usual bunker noise."
-        ),
-        group_chat_message=(
-            "Marnie: Heat's off the transcript — keep the next briefing boring on purpose."
-        ),
+        message=EVENT_FIRESIDE_BACKLASH_AUTO_RESOLVE_MESSAGE,
+        group_chat_message=EVENT_FIRESIDE_BACKLASH_AUTO_RESOLVE_GROUP_CHAT,
     )
 
 
@@ -324,16 +308,11 @@ def _fireside_backlash_player_resolve(_user_id: str, _tick_time: datetime) -> Ev
 
 
 def _fireside_backlash_spawn_announce(_user_id: str, _tick_time: datetime) -> str | None:
-    return (
-        "!!Word spreads fast: residents circulate rough transcripts and "
-        "spot holes in your speech."
-    )
+    return EVENT_FIRESIDE_BACKLASH_SPAWN_ANNOUNCE
 
 
 def _fireside_backlash_spawn_group_chat(_user_id: str, _tick_time: datetime) -> str | None:
-    return (
-        "Tamsin: They're quoting you line-by-line in Corridor C — tighten the narrative or we lose them."
-    )
+    return EVENT_FIRESIDE_BACKLASH_SPAWN_GROUP_CHAT
 
 
 def _fireside_backlash_on_spawn(user_id: str, tick_time: datetime) -> None:
@@ -371,12 +350,8 @@ def _geiger_exodus_auto_resolve(user_id: str, _tick_time: datetime) -> EventOutc
 
     return EventOutcome(
         loyalty_delta=0.0,
-        message=(
-            "The scramble toward the hatch loses steam — whoever could bolt already did."
-        ),
-        group_chat_message=(
-            "Nadia: Exodus chatter peaked — those still here want a face-saving story tonight."
-        ),
+        message=EVENT_GEIGER_EXODUS_AUTO_RESOLVE_MESSAGE,
+        group_chat_message=EVENT_GEIGER_EXODUS_AUTO_RESOLVE_GROUP_CHAT,
     )
 
 
@@ -515,19 +490,13 @@ def enqueue_geiger_rumor_exodus(user_id: str, when: datetime, population_count: 
     )
     _post_player_message(
         user_id,
-        (
-            "!!Rumors spread that Geiger readings outside are lower than what you've reported. "
-            "People quietly kit up to chance it on their own; others linger, waiting on word from you."
-        ),
+        EVENT_GEIGER_RUMOR_EXODUS_BULLETIN,
         when,
         channel=MESSAGE_CHANNEL_BULLETIN,
     )
     _post_player_message(
         user_id,
-        (
-            "Marnie: Quiet kits by the hatch — they're comparing your numbers to scout gossip. "
-            "We need alignment before this becomes a stampede."
-        ),
+        EVENT_GEIGER_RUMOR_EXODUS_GROUP_CHAT,
         when,
         channel=MESSAGE_CHANNEL_GROUP_CHAT,
     )
@@ -793,7 +762,7 @@ def finalize_investigation_if_due(user_id: str, tick_time: datetime) -> float:
     if target_sys:
         subsystem_lbl = GAME_SYSTEM_LABELS.get(target_sys, target_sys)
     else:
-        subsystem_lbl = "the bunker"
+        subsystem_lbl = INVESTIGATION_FALLBACK_SUBSYSTEM_LABEL
 
     ev = None
     if target_sys is not None:
