@@ -101,7 +101,7 @@ INITIAL_RADIATION = 100.0
 # variance scales down linearly as outdoor truth decays (truth stays in ``level``).
 RADIATION_DISPLAY_NOISE_MAX = 10.0
 DECAY_TICK_SECONDS = 1
-DECAY_HALF_LIFE_SECONDS = 600
+DECAY_HALF_LIFE_SECONDS = 120
 
 # --- Population & loyalty ---
 INITIAL_POPULATION = 100
@@ -116,7 +116,7 @@ RADIATION_SAFE_THRESHOLD = 50.0
 
 # One-shot rumor crisis when outdoor truth first drops **below** bunker doubt (see ``game_tick``).
 GEIGER_RUMOR_CRISIS_DURATION_SECONDS = 60
-GEIGER_RUMOR_EMIGRATION_FRACTION = 0.2
+GEIGER_RUMOR_EMIGRATION_FRACTION = 0.34
 
 # Each tick, each unit of "effective disloyalty" contributes this fraction
 # of the population as departures:
@@ -148,7 +148,7 @@ CRANK_WORKERS_LOYALTY_PENALTY = 0.5
 MANUAL_CRANK_ENERGY = 1.0
 
 # --- Farming ---
-INITIAL_FOOD = 10000.0
+INITIAL_FOOD = 500.0
 INITIAL_FARM_WORKERS = 10
 FOOD_PER_CAPITA_PER_SECOND = 0.01
 # Farm workers no longer add passive food each tick; they only affect per-plot harvest size.
@@ -162,7 +162,7 @@ RAT_BACKGROUND_INITIAL_DRAIN_PS = 0.1
 RAT_BACKGROUND_DRIFT_STEP_PS = 0.006
 RAT_BACKGROUND_DRAIN_MIN_PS = 0.004
 RAT_BACKGROUND_DRAIN_MAX_PS = 0.055
-FARM_PLANT_GROWTH_SECONDS = 300
+FARM_PLANT_GROWTH_SECONDS = 120
 # Harvest food when average assigned farm workers during the growth window equals this reference.
 FARM_HARVEST_YIELD = 50.0
 FARM_HARVEST_YIELD_REF_AVG_WORKERS = 10.0
@@ -219,7 +219,7 @@ MESSAGE_CHANNEL_GROUP_CHAT = "group_chat"
 
 # --- Social (boredom / doubt / inner circle) ---
 INITIAL_BOREDOM = 0.0
-INITIAL_DOUBT = 0.0
+INITIAL_DOUBT = 45.0
 # Hidden stat: legacy aggregate for meet-council; synced from member mean in ``game_tick``.
 INITIAL_INNER_CIRCLE_LOYALTY = 50
 
@@ -233,12 +233,12 @@ INNER_CIRCLE_MEMBER_NAMES: tuple[str, ...] = (
 )
 INNER_CIRCLE_MEMBER_COUNT = len(INNER_CIRCLE_MEMBER_NAMES)
 # Starting liquid currency for new bunker sessions (Inner Circle dashboard).
-INITIAL_INNER_CIRCLE_CASH = 1000.0
+INITIAL_INNER_CIRCLE_CASH = 50.0
 # Focus / narrative: Inner Circle member slot that leaves during ``Venture Out`` (0-based index).
 VENTURE_OUT_DEPARTING_MEMBER_SLOT = 2
 # --- Focus predicates ---
-SHAKESPEARE_FOCUS_LOYALTY_BELOW = 70.0
-SHAKESPEARE_FOCUS_BOREDOM_ABOVE = 30.0
+SHAKESPEARE_FOCUS_LOYALTY_BELOW = 75.0
+SHAKESPEARE_FOCUS_BOREDOM_ABOVE = 15.0
 TEMP_JOB_FOCUS_CASH_THRESHOLD = 20.0
 VENTURE_OUT_FAREWELL_MESSAGE = (
     "{name}: I've said three versions of this message aloud in an empty stairwell and deleted them all. "
@@ -315,17 +315,17 @@ INNER_CIRCLE_TEMP_JOB_DOUBT_BAD_CHANCE = 0.48
 INNER_CIRCLE_TEMP_JOB_DOUBT_BAD_AMOUNT = 15.0
 
 # Boredom rises slowly while nothing entertains the population.
-BOREDOM_PER_SECOND = 0.02
+BOREDOM_PER_SECOND = 0.08
 
 # Loyalty lost per second when boredom is at 100 (scaled linearly: boredom/100).
 BOREDOM_LOYALTY_DRAIN_PER_SECOND_AT_FULL = 0.08
 
 # Doubt rises faster when outdoor truth radiation is far below session start (100 rads).
-DOUBT_GROWTH_MAX_PER_SECOND = 0.025
+DOUBT_GROWTH_MAX_PER_SECOND = 0.04
 
 SOCIAL_MOVIE_COOLDOWN_SECONDS = 300
-SOCIAL_SPEECH_COOLDOWN_SECONDS = 300
-SOCIAL_COUNCIL_COOLDOWN_SECONDS = 600
+SOCIAL_SPEECH_COOLDOWN_SECONDS = 120
+SOCIAL_COUNCIL_COOLDOWN_SECONDS = 180
 
 # Per-title screenings: boredom relief scales down via 1/(1 + k * that_title's completed count).
 SOCIAL_MOVIE_DIMINISH_K = 0.45
@@ -337,7 +337,7 @@ SOCIAL_SPEECH_DIMINISH_K = 0.5
 # Cooldown between Fireside Chat sessions after ``Fireside Chats`` focus completes (before Brimstone).
 FIRESIDE_CHAT_COOLDOWN_SECONDS = 120
 # Early-game panel behaves like Give Speech: only reassuring chat type; longer cooldown.
-FIRESIDE_GIVE_SPEECH_COOLDOWN_SECONDS = 300
+FIRESIDE_GIVE_SPEECH_COOLDOWN_SECONDS = 120
 # After ``Fire and Brimstone`` focus.
 FIRESIDE_BRIMSTONE_COOLDOWN_SECONDS = 60
 FIRESIDE_CHAT_DURATION_SECONDS = 30
@@ -375,7 +375,7 @@ MOVIE_EXHAUSTION_LOYALTY_DRAIN_PER_SECOND_AT_FULL = 0.06
 MOVIE_EXHAUSTION_GAIN_PER_PLAY = 18.0
 
 # --- Sermon (global action lock) ---
-SERMON_DURATION_SECONDS = 120
+SERMON_DURATION_SECONDS = 60
 SERMON_COMPLETION_LOYALTY_GAIN = 15.0
 SERMON_COMPLETION_BOREDOM_RELIEF = 25.0
 
@@ -419,10 +419,10 @@ BASKET_WEAVING_LOYALTY_PER_SECOND: tuple[float, ...] = (
 # Off-books cash per inhabitant per second (hours up → more covert sales; × population in ``game_tick``).
 BASKET_WEAVING_CASH_PER_PERSON_PER_SECOND: tuple[float, ...] = (
     0.0,
-    0.001,
-    0.002,
-    0.003,
-    0.004,
+    0.0001,
+    0.0002,
+    0.0003,
+    0.0004,
 )
 
 
